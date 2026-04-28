@@ -20,25 +20,26 @@ Site démo statique : clone de [www.esmt.sn](https://www.esmt.sn) avec un widget
 
 ## Dev local
 
-1. Lancer l'app Flutter dans un terminal :
+L'app Flutter Yeekai est lancée sur **un port fixe (`52022`)** via le wrapper
+[`scripts/run_web.sh`](../yeebus_filthy_mvp/scripts/run_web.sh) du repo Flutter.
+Ainsi `config.js` n'a jamais besoin d'être modifié entre deux runs.
+
+1. Lancer l'app Flutter sur le port verrouillé :
    ```bash
    cd ~/StudioProjects/yeebus_filthy_mvp
-   fvm flutter run -d chrome
+   ./scripts/run_web.sh
    ```
-   Note le port utilisé (ex: `52022`) — affiché dans `Debug service listening on ws://127.0.0.1:<port>/...`.
+   Ou via VS Code : sélectionner la config **« Flutter Web (port 52022) »**.
 
-2. Mettre à jour `config.js` avec cette URL :
-   ```js
-   window.FLUTTER_APP_URL = "http://localhost:52022/";
-   ```
-
-3. Servir ce site localement (port différent de Flutter) :
+2. Servir ce site localement (port 8080, indépendant de Flutter) :
    ```bash
    cd ~/StudioProjects/esmt-rita-demo
    python3 -m http.server 8080
    ```
 
-4. Ouvrir [http://localhost:8080/](http://localhost:8080/) dans le navigateur. Le clic sur le bouton Rita ouvre l'app Flutter dans le panneau.
+3. Ouvrir [http://localhost:8080/](http://localhost:8080/) dans le navigateur.
+   Le clic sur le bouton Rita ouvre l'app Flutter (`http://localhost:52022/`)
+   dans le panneau latéral.
 
 ## Déploiement Vercel
 

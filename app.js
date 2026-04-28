@@ -2,6 +2,8 @@
 // - Embed du site ESMT cloné localement (./esmt-clone/) dans un iframe plein écran
 // - Bouton flottant en bas à droite : ouvre/ferme un panneau latéral
 // - Le panneau charge l'app Flutter Yeekai depuis window.FLUTTER_APP_URL (config.js)
+// - L'iframe Flutter est préchargée en arrière-plan (idle callback après window.load)
+//   pour que l'ouverture du panneau soit instantanée
 
 (function () {
   const fab = document.getElementById('rita-fab');
@@ -9,20 +11,47 @@
   const backdrop = document.getElementById('rita-backdrop');
   const closeBtn = document.getElementById('rita-close');
   const ritaFrame = document.getElementById('rita-frame');
+  const teaser = document.getElementById('rita-teaser');
+  const teaserClose = document.getElementById('rita-teaser-close');
 
-  let panelLoaded = false;
+  let frameLoaded = false;
+
+  const TEASER_KEY = 'rita-teaser-dismissed';
+  const TEASER_DELAY = 1200; // ms après window.load
+
+  function showTeaser() {
+    if (!teaser) return;
+    try {
+      if (localStorage.getItem(TEASER_KEY) === 'true') return;
+    } catch (e) { /* localStorage indispo : on l'affiche quand même */ }
+    teaser.classList.add('is-visible');
+    teaser.setAttribute('aria-hidden', 'false');
+  }
+
+  function hideTeaser({ persist = false } = {}) {
+    if (!teaser) return;
+    teaser.classList.remove('is-visible');
+    teaser.setAttribute('aria-hidden', 'true');
+    if (persist) {
+      try { localStorage.setItem(TEASER_KEY, 'true'); } catch (e) { /* noop */ }
+    }
+  }
+
+  function loadFrame() {
+    if (frameLoaded) return;
+    const flutterUrl = window.FLUTTER_APP_URL;
+    if (!flutterUrl) {
+      console.error('[Rita] FLUTTER_APP_URL non défini dans config.js');
+      return;
+    }
+    ritaFrame.src = flutterUrl;
+    frameLoaded = true;
+  }
 
   function openPanel() {
-    if (!panelLoaded) {
-      // Lazy-load du chat Flutter — on évite de bouter le SPA tant que l'utilisateur n'a pas cliqué
-      const flutterUrl = window.FLUTTER_APP_URL;
-      if (!flutterUrl) {
-        console.error('[Rita] FLUTTER_APP_URL non défini dans config.js');
-        return;
-      }
-      ritaFrame.src = flutterUrl;
-      panelLoaded = true;
-    }
+    // Sécurité : si la préchargée n'a pas encore eu lieu (clic ultra-rapide), on la lance
+    loadFrame();
+    hideTeaser({ persist: true }); // l'utilisateur a engagé : pas besoin de remontrer le teaser
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     fab.classList.add('is-hidden');
@@ -55,4 +84,35 @@
       closePanel();
     }
   });
+
+  // Bouton × du teaser : ferme et persiste le dismiss
+  if (teaserClose) {
+    teaserClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideTeaser({ persist: true });
+    });
+  }
+
+  // Précharge l'app Flutter en arrière-plan, après que la page principale soit chargée,
+  // pendant un slot d'inactivité du navigateur. Le panneau reste invisible (CSS),
+  // mais le SPA Flutter est prêt en mémoire pour une ouverture sans latence.
+  function schedulePreload() {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(loadFrame, { timeout: 3000 });
+    } else {
+      setTimeout(loadFrame, 1500);
+    }
+  }
+  function scheduleTeaser() {
+    setTimeout(showTeaser, TEASER_DELAY);
+  }
+  if (document.readyState === 'complete') {
+    schedulePreload();
+    scheduleTeaser();
+  } else {
+    window.addEventListener('load', () => {
+      schedulePreload();
+      scheduleTeaser();
+    }, { once: true });
+  }
 })();

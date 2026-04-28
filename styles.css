@@ -33,6 +33,77 @@ html, body {
   background: #fff;
 }
 
+/* ─── Teaser bubble (1er chargement) ───────────── */
+
+#rita-teaser {
+  position: fixed;
+  right: 110px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  max-width: 280px;
+  min-height: 78px;
+  background: #ffffff;
+  color: var(--rita-text);
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transform: translateX(8px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  z-index: 9997;
+}
+#rita-teaser.is-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+/* Petit triangle qui pointe vers le FAB à droite */
+#rita-teaser::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 8px solid transparent;
+  border-left-color: #ffffff;
+}
+
+#rita-teaser-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.08);
+  color: #555;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+#rita-teaser-close:hover {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.rita-teaser-text {
+  font-weight: 500;
+}
+
+/* Sur mobile (panneau plein écran), on cache le teaser */
+@media (max-width: 600px) {
+  #rita-teaser {
+    display: none;
+  }
+}
+
 /* ─── Floating action button ───────────────────── */
 
 #rita-fab {
