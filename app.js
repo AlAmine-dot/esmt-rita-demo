@@ -31,25 +31,18 @@
       if (doc.getElementById('__rita-scroll-fix')) return; // déjà injecté
       const style = doc.createElement('style');
       style.id = '__rita-scroll-fix';
-      // Le body devient le conteneur scrollable (cf. PierBover/ios-iframe-fix).
-      // html est figé en pseudo-viewport, body est position:absolute plein écran
-      // avec overflow-y:auto. Tout le contenu Drupal naturel de la page coule
-      // dedans et scrolle nativement à l'intérieur du document de l'iframe.
       style.textContent = `
-        html {
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
+        html, body {
+          height: 100%;
           margin: 0;
-          padding: 0;
-          overflow: hidden;
         }
-        body {
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          margin: 0;
+        html {
           overflow-y: auto;
           overflow-x: hidden;
           -webkit-overflow-scrolling: touch;
+        }
+        body {
+          min-height: 100%;
         }
       `;
       doc.head.appendChild(style);
