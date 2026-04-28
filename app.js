@@ -15,10 +15,10 @@
   const teaserClose = document.getElementById('rita-teaser-close');
   const esmtFrame = document.getElementById('esmt-frame');
 
-  // iOS Safari : une iframe scrollable avec body contraint ne reçoit pas
-  // correctement les gestes tactiles. Solution : l'iframe est en `scrolling="no"`,
-  // on dimensionne sa hauteur à celle de son contenu, et c'est le wrapper
-  // (#esmt-scroll) qui gère le scroll natif.
+  // iOS Safari : une iframe scrollable ne reçoit pas correctement les gestes
+  // tactiles. Solution : l'iframe est en `scrolling="no"` et on cale sa hauteur
+  // sur celle de son contenu, pour que ce soit le body lui-même qui scrolle
+  // (le scroll natif du body fonctionne nickel sur iOS).
   function syncEsmtFrameHeight() {
     if (!esmtFrame) return;
     try {
@@ -33,6 +33,8 @@
   }
   if (esmtFrame) {
     esmtFrame.addEventListener('load', () => {
+      // Nouvelle page chargée dans l'iframe : on remonte le body en haut.
+      window.scrollTo(0, 0);
       syncEsmtFrameHeight();
       // Drupal/jQuery peut ajouter du contenu après le load — on remesure.
       setTimeout(syncEsmtFrameHeight, 300);
@@ -75,10 +77,31 @@
     frameLoaded = true;
   }
 
+  let savedScrollY = 0;
+
+  function lockBodyScroll() {
+    savedScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockBodyScroll() {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, savedScrollY);
+  }
+
   function openPanel() {
     // Sécurité : si la préchargée n'a pas encore eu lieu (clic ultra-rapide), on la lance
     loadFrame();
     hideTeaser({ persist: true }); // l'utilisateur a engagé : pas besoin de remontrer le teaser
+    lockBodyScroll();
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     fab.classList.add('is-hidden');
@@ -92,6 +115,7 @@
     fab.classList.remove('is-hidden');
     panel.setAttribute('aria-hidden', 'true');
     fab.setAttribute('aria-expanded', 'false');
+    unlockBodyScroll();
   }
 
   fab.addEventListener('click', () => {
