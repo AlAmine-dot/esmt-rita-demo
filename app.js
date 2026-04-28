@@ -37,11 +37,117 @@
       window.scrollTo(0, 0);
       syncEsmtFrameHeight();
       // Drupal/jQuery peut ajouter du contenu après le load — on remesure.
-      setTimeout(syncEsmtFrameHeight, 300);
-      setTimeout(syncEsmtFrameHeight, 1200);
+      setTimeout(() => { syncEsmtFrameHeight(); updateScrollbar(); }, 300);
+      setTimeout(() => { syncEsmtFrameHeight(); updateScrollbar(); }, 1200);
     });
-    window.addEventListener('resize', syncEsmtFrameHeight);
+    window.addEventListener('resize', () => {
+      syncEsmtFrameHeight();
+      updateScrollbar();
+    });
   }
+
+  // ─── Scrollbar custom (fallback iOS/Chrome mobile) ─────────────────────
+  // Sur iOS Safari et certaines versions Chrome mobile, les gestes tactiles
+  // qui démarrent sur l'iframe ne propagent pas leur scroll au body parent.
+  // La scrollbar custom est un élément du parent : ses propres événements
+  // tactiles ne souffrent pas de cette limitation, donc le drag scrolle le
+  // body de manière fiable.
+  const scrollbar = document.getElementById('esmt-scrollbar');
+  const scrollbarThumb = document.getElementById('esmt-scrollbar-thumb');
+
+  function updateScrollbar() {
+    if (!scrollbar || !scrollbarThumb) return;
+    const docHeight = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight
+    );
+    const winHeight = window.innerHeight;
+    if (docHeight <= winHeight + 1) {
+      scrollbar.style.display = 'none';
+      return;
+    }
+    scrollbar.style.display = 'block';
+    const trackHeight = scrollbar.clientHeight;
+    const thumbHeight = Math.max(40, (winHeight / docHeight) * trackHeight);
+    const maxScroll = docHeight - winHeight;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const thumbY = (scrollY / maxScroll) * (trackHeight - thumbHeight);
+    scrollbarThumb.style.height = thumbHeight + 'px';
+    scrollbarThumb.style.top = thumbY + 'px';
+  }
+
+  let drag = null;
+  function startDrag(clientY) {
+    drag = {
+      startY: clientY,
+      startThumbTop: scrollbarThumb.offsetTop,
+    };
+    scrollbarThumb.classList.add('is-dragging');
+  }
+  function moveDrag(clientY) {
+    if (!drag) return;
+    const docHeight = Math.max(
+      document.documentElement.scrollHeight,
+      document.body.scrollHeight
+    );
+    const winHeight = window.innerHeight;
+    const trackHeight = scrollbar.clientHeight;
+    const thumbHeight = scrollbarThumb.clientHeight;
+    const maxScroll = docHeight - winHeight;
+    const dY = clientY - drag.startY;
+    const newThumbTop = Math.max(
+      0,
+      Math.min(trackHeight - thumbHeight, drag.startThumbTop + dY)
+    );
+    const ratio = newThumbTop / (trackHeight - thumbHeight);
+    window.scrollTo(0, ratio * maxScroll);
+  }
+  function endDrag() {
+    drag = null;
+    if (scrollbarThumb) scrollbarThumb.classList.remove('is-dragging');
+  }
+
+  if (scrollbarThumb) {
+    // Touch (mobile)
+    scrollbarThumb.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      startDrag(e.touches[0].clientY);
+    }, { passive: false });
+    document.addEventListener('touchmove', (e) => {
+      if (!drag) return;
+      e.preventDefault();
+      moveDrag(e.touches[0].clientY);
+    }, { passive: false });
+    document.addEventListener('touchend', endDrag);
+    document.addEventListener('touchcancel', endDrag);
+
+    // Mouse (desktop fallback ; le wheel natif marche aussi)
+    scrollbarThumb.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startDrag(e.clientY);
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (drag) moveDrag(e.clientY);
+    });
+    document.addEventListener('mouseup', endDrag);
+
+    // Click sur la track (hors thumb) : saute à la position
+    scrollbar.addEventListener('click', (e) => {
+      if (e.target === scrollbarThumb) return;
+      const rect = scrollbar.getBoundingClientRect();
+      const clickY = e.clientY - rect.top;
+      const docHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      const winHeight = window.innerHeight;
+      const maxScroll = docHeight - winHeight;
+      const ratio = clickY / scrollbar.clientHeight;
+      window.scrollTo({ top: ratio * maxScroll, behavior: 'smooth' });
+    });
+  }
+
+  window.addEventListener('scroll', updateScrollbar, { passive: true });
 
   let frameLoaded = false;
 
