@@ -229,14 +229,24 @@
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     fab.classList.add('is-hidden');
+    panel.removeAttribute('inert');
     panel.setAttribute('aria-hidden', 'false');
     fab.setAttribute('aria-expanded', 'true');
   }
 
   function closePanel() {
+    // On rapatrie d'abord le focus sur le FAB : sinon, si l'utilisateur vient
+    // de cliquer le bouton ✕ (qui est dans le panneau), il garde le focus
+    // pendant qu'on met aria-hidden/inert sur l'ancêtre — Chrome bloque ça
+    // par accessibilité. Déplacer le focus avant lève le warning et améliore
+    // la nav clavier (l'utilisateur retombe au bon endroit).
+    if (panel.contains(document.activeElement)) {
+      fab.focus({ preventScroll: true });
+    }
     panel.classList.remove('is-open');
     backdrop.classList.remove('is-open');
     fab.classList.remove('is-hidden');
+    panel.setAttribute('inert', '');
     panel.setAttribute('aria-hidden', 'true');
     fab.setAttribute('aria-expanded', 'false');
     unlockBodyScroll();
