@@ -15,41 +15,32 @@
   const teaserClose = document.getElementById('rita-teaser-close');
   const esmtFrame = document.getElementById('esmt-frame');
 
-  // iOS Safari ne propage pas les gestes tactiles depuis une iframe vers le
-  // document parent — donc même si le body parent est scrollable, le scroll
-  // ne marche qu'au tout premier touch (puis se bloque). Solution canonique
-  // (cf. github.com/PierBover/ios-iframe-fix) : faire scroller le contenu
-  // *à l'intérieur* du document de l'iframe, en mettant son <html>/<body> en
-  // overflow:auto avec `-webkit-overflow-scrolling: touch`. Comme tout se passe
-  // dans le document de l'iframe, aucune frontière à franchir : iOS gère
-  // naturellement.
-  function injectScrollFix() {
+  // iOS Safari : une iframe scrollable ne reçoit pas correctement les gestes
+  // tactiles. Solution : l'iframe est en `scrolling="no"` et on cale sa hauteur
+  // sur celle de son contenu, pour que ce soit le body lui-même qui scrolle
+  // (le scroll natif du body fonctionne nickel sur iOS).
+  function syncEsmtFrameHeight() {
     if (!esmtFrame) return;
     try {
       const doc = esmtFrame.contentDocument;
       if (!doc || !doc.documentElement) return;
-      if (doc.getElementById('__rita-scroll-fix')) return; // déjà injecté
-      const style = doc.createElement('style');
-      style.id = '__rita-scroll-fix';
-      style.textContent = `
-        html, body {
-          height: 100%;
-          margin: 0;
-        }
-        html {
-          overflow-y: auto;
-          overflow-x: hidden;
-          -webkit-overflow-scrolling: touch;
-        }
-        body {
-          min-height: 100%;
-        }
-      `;
-      doc.head.appendChild(style);
-    } catch (e) { /* cross-origin (lien externe ouvert dans l'iframe) : on n'y peut rien */ }
+      const h = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body ? doc.body.scrollHeight : 0
+      );
+      if (h > 0) esmtFrame.style.height = h + 'px';
+    } catch (e) { /* cross-origin : on garde le fallback CSS */ }
   }
   if (esmtFrame) {
-    esmtFrame.addEventListener('load', injectScrollFix);
+    esmtFrame.addEventListener('load', () => {
+      // Nouvelle page chargée dans l'iframe : on remonte le body en haut.
+      window.scrollTo(0, 0);
+      syncEsmtFrameHeight();
+      // Drupal/jQuery peut ajouter du contenu après le load — on remesure.
+      setTimeout(syncEsmtFrameHeight, 300);
+      setTimeout(syncEsmtFrameHeight, 1200);
+    });
+    window.addEventListener('resize', syncEsmtFrameHeight);
   }
 
   let frameLoaded = false;
@@ -86,10 +77,31 @@
     frameLoaded = true;
   }
 
+  let savedScrollY = 0;
+
+  function lockBodyScroll() {
+    savedScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+
+  function unlockBodyScroll() {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, savedScrollY);
+  }
+
   function openPanel() {
     // Sécurité : si la préchargée n'a pas encore eu lieu (clic ultra-rapide), on la lance
     loadFrame();
     hideTeaser({ persist: true }); // l'utilisateur a engagé : pas besoin de remontrer le teaser
+    lockBodyScroll();
     panel.classList.add('is-open');
     backdrop.classList.add('is-open');
     fab.classList.add('is-hidden');
@@ -103,6 +115,7 @@
     fab.classList.remove('is-hidden');
     panel.setAttribute('aria-hidden', 'true');
     fab.setAttribute('aria-expanded', 'false');
+    unlockBodyScroll();
   }
 
   fab.addEventListener('click', () => {
