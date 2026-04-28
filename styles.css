@@ -17,20 +17,21 @@
 html, body {
   margin: 0;
   padding: 0;
+  height: 100%;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--rita-text);
   background: #fff;
-  overflow-x: hidden;
 }
 
-/* iOS Safari ne route pas correctement les gestes tactiles vers le contenu d'une
-   iframe quand son parent est contraint. Solution : iframe sans scroll interne,
-   sa hauteur est calée sur celle de son contenu (cf. app.js), et c'est le body
-   lui-même qui scrolle nativement — comportement nickel sur iOS. */
+/* L'iframe occupe tout le viewport. Le scroll est géré à l'intérieur du document
+   de l'iframe (cf. app.js → injectScrollFix), parce qu'iOS Safari ne propage pas
+   les gestes tactiles depuis l'iframe vers le body parent. */
 #esmt-frame {
-  display: block;
+  position: fixed;
+  inset: 0;
   width: 100%;
-  height: 100vh; /* fallback ; ajusté au contenu par JS au load */
+  height: 100%;
   border: 0;
   background: #fff;
 }
