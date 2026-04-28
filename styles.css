@@ -74,10 +74,25 @@ html::-webkit-scrollbar {
   cursor: grab;
   transition: background 0.15s ease;
 }
-/* Track plus large + thumb plus large sur mobile pour faciliter la prise au doigt */
+/* Track + thumb épaissis sur mobile : la scrollbar est l'alternative fiable au
+   scroll natif (qui est aléatoire dans les iframes iOS), donc on la rend bien
+   visible et facile à saisir au doigt. */
 @media (pointer: coarse) {
-  #esmt-scrollbar { width: 16px; }
-  #esmt-scrollbar-thumb { width: 12px; right: 2px; }
+  #esmt-scrollbar {
+    width: 28px;
+    background: rgba(0, 0, 0, 0.08);
+  }
+  #esmt-scrollbar-thumb {
+    width: 22px;
+    right: 3px;
+    min-height: 70px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 11px;
+  }
+  #esmt-scrollbar-thumb:hover,
+  #esmt-scrollbar-thumb.is-dragging {
+    background: rgba(0, 0, 0, 0.65);
+  }
 }
 #esmt-scrollbar-thumb:hover,
 #esmt-scrollbar-thumb.is-dragging {
