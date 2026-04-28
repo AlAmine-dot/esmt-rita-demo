@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESMT — Démo Rita</title>
+  <link rel="icon" type="image/png" href="./assets/rita-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <iframe
+    id="esmt-frame"
+    src="./esmt-clone/index.html"
+    title="Site ESMT"
+    referrerpolicy="no-referrer-when-downgrade"
+  ></iframe>
+
+  <button
+    id="rita-fab"
+    type="button"
+    aria-label="Discuter avec Rita"
+    title="Discuter avec Rita"
+  >
+    <img src="./assets/rita-icon.png" alt="Rita" />
+  </button>
+
+  <div id="rita-backdrop" aria-hidden="true"></div>
+
+  <aside id="rita-panel" aria-hidden="true">
+    <header class="panel-header">
+      <div class="panel-title">
+        <img
+          class="panel-avatar"
+          src="./assets/rita-light.png"
+          alt=""
+        />
+        <div class="panel-title-text">
+          <span class="panel-name">Rita</span>
+          <span class="panel-subtitle">Assistant ESMT</span>
+        </div>
+      </div>
+      <button
+        id="rita-close"
+        type="button"
+        aria-label="Fermer le chat"
+        title="Fermer"
+      >
+        ✕
+      </button>
+    </header>
+    <iframe
+      id="rita-frame"
+      title="Chat Rita"
+      allow="microphone; clipboard-write; geolocation"
+      referrerpolicy="no-referrer"
+    ></iframe>
+  </aside>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

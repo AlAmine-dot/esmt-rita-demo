@@ -1,0 +1,246 @@
+/* ESMT Démo + widget Rita — thème Yeekai */
+
+:root {
+  --rita-blue-start: #0066cc;
+  --rita-blue-end: #00a3ff;
+  --rita-blue-shadow: rgba(0, 102, 204, 0.35);
+  --rita-online: #4ade80;
+  --rita-text: #1d1d1d;
+  --rita-bg: #ffffff;
+  --rita-window-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--rita-text);
+  background: #f4f4f4;
+}
+
+#esmt-frame {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* ─── Floating action button ───────────────────── */
+
+#rita-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 78px;
+  height: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 9998;
+  display: block;
+  isolation: isolate;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+#rita-fab:hover {
+  transform: scale(1.06);
+}
+#rita-fab:active {
+  transform: scale(0.97);
+}
+#rita-fab img {
+  width: 100%;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  /* Ombre qui suit le contour alpha de Rita au lieu d'un rectangle */
+  filter: drop-shadow(0 8px 18px var(--rita-blue-shadow));
+  transition: filter 0.25s ease;
+}
+#rita-fab:hover img {
+  filter: drop-shadow(0 12px 28px rgba(0, 102, 204, 0.55));
+}
+#rita-fab.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+/* Halo pulse — anneau derrière l'asset, aligné sur le cercle bleu visible */
+#rita-fab::after {
+  content: "";
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid var(--rita-blue-end);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  animation: rita-pulse 2.4s ease-out infinite;
+}
+@keyframes rita-pulse {
+  0%   { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0;    transform: translateX(-50%) scale(1.6); }
+}
+
+/* ─── Backdrop ─────────────────────────────────── */
+
+#rita-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.2s ease;
+  z-index: 9997;
+}
+#rita-backdrop.is-open {
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+/* ─── Floating window ──────────────────────────── */
+
+#rita-panel {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  bottom: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: var(--rita-bg);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--rita-window-shadow);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(20px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  z-index: 9999;
+}
+#rita-panel.is-open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ─── Header ───────────────────────────────────── */
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--rita-blue-start) 0%, var(--rita-blue-end) 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-title .panel-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  object-fit: cover;
+  object-position: top;
+}
+
+.panel-title-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.panel-title-text .panel-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Point vert "online" — exact pattern de la référence */
+.panel-title-text .panel-name::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rita-online);
+  box-shadow: 0 0 8px var(--rita-online);
+  flex-shrink: 0;
+}
+
+.panel-title-text .panel-subtitle {
+  font-size: 12px;
+  opacity: 0.88;
+  margin-top: 1px;
+}
+
+#rita-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: 0;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+#rita-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ─── Iframe ───────────────────────────────────── */
+
+#rita-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* ─── Mobile fullscreen ────────────────────────── */
+
+@media (max-width: 480px) {
+  #rita-panel {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  #rita-fab {
+    right: 16px;
+    bottom: 16px;
+  }
+}
