@@ -13,6 +13,33 @@
   const ritaFrame = document.getElementById('rita-frame');
   const teaser = document.getElementById('rita-teaser');
   const teaserClose = document.getElementById('rita-teaser-close');
+  const esmtFrame = document.getElementById('esmt-frame');
+
+  // iOS Safari : une iframe scrollable avec body contraint ne reçoit pas
+  // correctement les gestes tactiles. Solution : l'iframe est en `scrolling="no"`,
+  // on dimensionne sa hauteur à celle de son contenu, et c'est le wrapper
+  // (#esmt-scroll) qui gère le scroll natif.
+  function syncEsmtFrameHeight() {
+    if (!esmtFrame) return;
+    try {
+      const doc = esmtFrame.contentDocument;
+      if (!doc || !doc.documentElement) return;
+      const h = Math.max(
+        doc.documentElement.scrollHeight,
+        doc.body ? doc.body.scrollHeight : 0
+      );
+      if (h > 0) esmtFrame.style.height = h + 'px';
+    } catch (e) { /* cross-origin : on garde le fallback CSS */ }
+  }
+  if (esmtFrame) {
+    esmtFrame.addEventListener('load', () => {
+      syncEsmtFrameHeight();
+      // Drupal/jQuery peut ajouter du contenu après le load — on remesure.
+      setTimeout(syncEsmtFrameHeight, 300);
+      setTimeout(syncEsmtFrameHeight, 1200);
+    });
+    window.addEventListener('resize', syncEsmtFrameHeight);
+  }
 
   let frameLoaded = false;
 
