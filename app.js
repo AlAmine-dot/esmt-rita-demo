@@ -77,15 +77,13 @@
   }
 
   let drag = null;
+  let pendingScrollY = null;
+  let rafScheduled = false;
+
   function startDrag(clientY) {
-    drag = {
-      startY: clientY,
-      startThumbTop: scrollbarThumb.offsetTop,
-    };
-    scrollbarThumb.classList.add('is-dragging');
-  }
-  function moveDrag(clientY) {
-    if (!drag) return;
+    // On capte les valeurs de layout une seule fois au début du drag : pas
+    // besoin de relire `scrollHeight`/`clientHeight` à chaque touchmove (qui
+    // forcerait un layout-thrash et ferait saccader le drag sur iOS).
     const docHeight = Math.max(
       document.documentElement.scrollHeight,
       document.body.scrollHeight
@@ -93,17 +91,37 @@
     const winHeight = window.innerHeight;
     const trackHeight = scrollbar.clientHeight;
     const thumbHeight = scrollbarThumb.clientHeight;
-    const maxScroll = docHeight - winHeight;
+    drag = {
+      startY: clientY,
+      startThumbTop: scrollbarThumb.offsetTop,
+      maxThumbTop: Math.max(1, trackHeight - thumbHeight),
+      maxScroll: Math.max(0, docHeight - winHeight),
+    };
+    scrollbarThumb.classList.add('is-dragging');
+  }
+  function moveDrag(clientY) {
+    if (!drag) return;
     const dY = clientY - drag.startY;
-    const newThumbTop = Math.max(
-      0,
-      Math.min(trackHeight - thumbHeight, drag.startThumbTop + dY)
-    );
-    const ratio = newThumbTop / (trackHeight - thumbHeight);
-    window.scrollTo(0, ratio * maxScroll);
+    const newThumbTop = Math.max(0, Math.min(drag.maxThumbTop, drag.startThumbTop + dY));
+    const ratio = newThumbTop / drag.maxThumbTop;
+    pendingScrollY = ratio * drag.maxScroll;
+    // Throttle : on coalesce tous les touchmove dans un seul scrollTo par
+    // frame d'animation. iOS Safari fait jusqu'à 120 touchmove/s sur ProMotion,
+    // appliquer chacun en scrollTo cause des saccades visibles.
+    if (!rafScheduled) {
+      rafScheduled = true;
+      requestAnimationFrame(() => {
+        if (pendingScrollY !== null) {
+          window.scrollTo(0, pendingScrollY);
+          pendingScrollY = null;
+        }
+        rafScheduled = false;
+      });
+    }
   }
   function endDrag() {
     drag = null;
+    pendingScrollY = null;
     if (scrollbarThumb) scrollbarThumb.classList.remove('is-dragging');
   }
 
