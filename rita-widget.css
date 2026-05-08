@@ -252,7 +252,7 @@ html::-webkit-scrollbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  padding: 10px 14px;
   background: linear-gradient(135deg, var(--rita-blue-start) 0%, var(--rita-blue-end) 100%);
   color: #fff;
   flex-shrink: 0;
@@ -261,57 +261,38 @@ html::-webkit-scrollbar {
 .panel-title {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
-.panel-title .panel-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  object-fit: cover;
-  object-position: top;
-}
-
-.panel-title-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.panel-title-text .panel-name {
+/* Header simplifié : point vert "online" + texte "Propulsé par Yeekai".
+   Le ::before crée le dot ; le span lui-même est en flex pour l'alignement. */
+.panel-title .panel-name {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 15px;
+  gap: 8px;
+  font-size: 12px;
   font-weight: 600;
+  opacity: 0.92;
 }
 
-.panel-title-text .panel-name::before {
+.panel-title .panel-name::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--rita-online);
-  box-shadow: 0 0 8px var(--rita-online);
+  box-shadow: 0 0 10px var(--rita-online);
   flex-shrink: 0;
-}
-
-.panel-title-text .panel-subtitle {
-  font-size: 12px;
-  opacity: 0.88;
-  margin-top: 1px;
 }
 
 #rita-close {
   background: rgba(255, 255, 255, 0.15);
   border: 0;
   color: #fff;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   display: flex;
   align-items: center;
