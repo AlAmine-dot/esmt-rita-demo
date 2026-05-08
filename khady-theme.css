@@ -1,0 +1,14 @@
+/* Thème Khady (Bakeli) — overrides au-dessus de rita-widget.css.
+   À charger APRÈS rita-widget.css pour que la cascade fasse effet. */
+
+:root {
+  --rita-blue-start: #EE5F17;          /* dégradé header — départ orange foncé */
+  --rita-blue-end: #FF9700;            /* dégradé header — fin orange clair */
+  --rita-blue-shadow: rgba(238, 95, 23, 0.35);  /* ombre Khady (depuis #EE5F17) */
+}
+
+/* Le hover du FAB utilise une couleur hardcodée dans rita-widget.css : on la
+   remplace par l'orange Khady ici. */
+#rita-fab:hover img {
+  filter: drop-shadow(0 12px 28px rgba(238, 95, 23, 0.55));
+}
