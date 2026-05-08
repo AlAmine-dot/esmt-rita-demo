@@ -6,6 +6,40 @@
 //   pour que l'ouverture du panneau soit instantanée
 
 (function () {
+  // ─── Debug overlay (active avec ?debug=1 dans l'URL) ─────────────────────
+  // Affiche en temps réel les événements touch/scroll pour diagnostiquer le
+  // bug de scroll mobile (iOS Safari + Chrome mobile-emulation). Pas d'erreur
+  // JS jetée par ce bug : il faut voir QUELS events arrivent et lesquels sont
+  // avalés. Activable sans modif de code via l'URL.
+  const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+  let dbg, touchmoveCount = 0, lastTouchTarget = '—', lastScrollY = 0;
+  if (DEBUG) {
+    dbg = document.createElement('div');
+    dbg.style.cssText = 'position:fixed;top:8px;left:8px;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;font:11px/1.3 monospace;padding:8px 10px;border-radius:6px;pointer-events:none;max-width:60vw;white-space:pre;';
+    document.body.appendChild(dbg);
+    function refresh() {
+      const bodyH = document.body.scrollHeight;
+      const iframeH = document.getElementById('esmt-frame')?.style.height || '?';
+      const winH = window.innerHeight;
+      const sy = Math.round(window.scrollY);
+      dbg.textContent =
+        `win:${winH}  body:${bodyH}  iframe:${iframeH}\n` +
+        `scrollY:${sy}  Δ:${sy - lastScrollY}\n` +
+        `touchmoves:${touchmoveCount}\n` +
+        `lastTouchOn:${lastTouchTarget}`;
+      lastScrollY = sy;
+      requestAnimationFrame(refresh);
+    }
+    refresh();
+    document.addEventListener('touchstart', (e) => {
+      const t = e.target;
+      lastTouchTarget = (t.id ? '#' + t.id : t.tagName) +
+        (t === document.getElementById('esmt-frame') ? ' (iframe)' : '');
+    }, { capture: true, passive: true });
+    document.addEventListener('touchmove', () => { touchmoveCount++; }, { capture: true, passive: true });
+    window.addEventListener('scroll', () => {}, { passive: true }); // refresh handles it
+  }
+
   const fab = document.getElementById('rita-fab');
   const panel = document.getElementById('rita-panel');
   const backdrop = document.getElementById('rita-backdrop');

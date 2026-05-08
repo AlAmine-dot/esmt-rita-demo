@@ -1,0 +1,348 @@
+/* Widget Rita — version sans reset html/body global, à injecter par-dessus
+   un site existant sans casser ses styles (cf. bakeli-clone/index.html).
+   Pour la démo ESMT (avec iframe wrapper), c'est styles.css qui est utilisé,
+   lui inclut en plus les règles de reset et de positionnement de l'iframe. */
+
+:root {
+  --rita-blue-start: #0066cc;
+  --rita-blue-end: #00a3ff;
+  --rita-blue-shadow: rgba(0, 102, 204, 0.35);
+  --rita-online: #4ade80;
+  --rita-text: #1d1d1d;
+  --rita-bg: #ffffff;
+  --rita-window-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+/* Masque la scrollbar native pour ne laisser que la custom visible. Sans ça
+   on aurait deux scrollbars côte à côte sur desktop. */
+html {
+  scrollbar-width: none; /* Firefox */
+}
+html::-webkit-scrollbar {
+  display: none; /* WebKit / Blink */
+}
+
+/* ─── Scrollbar custom ─────────────────────────────────────────────── */
+
+#esmt-scrollbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 9990;
+  background: rgba(0, 0, 0, 0.04);
+  display: none;
+  touch-action: none;
+}
+#esmt-scrollbar-thumb {
+  position: absolute;
+  right: 2px;
+  width: 8px;
+  min-height: 50px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  cursor: grab;
+  transition: background 0.15s ease;
+}
+@media (pointer: coarse) {
+  #esmt-scrollbar {
+    width: 28px;
+    background: rgba(0, 0, 0, 0.08);
+  }
+  #esmt-scrollbar-thumb {
+    width: 22px;
+    right: 3px;
+    min-height: 70px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 11px;
+  }
+  #esmt-scrollbar-thumb:hover,
+  #esmt-scrollbar-thumb.is-dragging {
+    background: rgba(0, 0, 0, 0.65);
+  }
+}
+#esmt-scrollbar-thumb:hover,
+#esmt-scrollbar-thumb.is-dragging {
+  background: rgba(0, 0, 0, 0.55);
+  cursor: grabbing;
+}
+
+/* ─── Teaser bubble ────────────────────────────────────────────────── */
+
+#rita-teaser {
+  position: fixed;
+  right: 110px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  max-width: 280px;
+  min-height: 78px;
+  background: #ffffff;
+  color: var(--rita-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transform: translateX(8px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+  z-index: 9997;
+}
+#rita-teaser.is-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+#rita-teaser::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 8px solid transparent;
+  border-left-color: #ffffff;
+}
+
+#rita-teaser-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.08);
+  color: #555;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+#rita-teaser-close:hover {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.rita-teaser-text {
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  #rita-teaser {
+    display: none;
+  }
+}
+
+/* ─── Floating action button ───────────────────────────────────────── */
+
+#rita-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 78px;
+  height: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 9998;
+  display: block;
+  isolation: isolate;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+#rita-fab:hover {
+  transform: scale(1.06);
+}
+#rita-fab:active {
+  transform: scale(0.97);
+}
+#rita-fab img {
+  width: 100%;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 18px var(--rita-blue-shadow));
+  transition: filter 0.25s ease;
+}
+#rita-fab:hover img {
+  filter: drop-shadow(0 12px 28px rgba(0, 102, 204, 0.55));
+}
+#rita-fab.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+#rita-fab::after {
+  content: "";
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  border: 2px solid var(--rita-blue-end);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  animation: rita-pulse 2.4s ease-out infinite;
+}
+@keyframes rita-pulse {
+  0%   { opacity: 0.55; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0;    transform: translateX(-50%) scale(1.6); }
+}
+
+/* ─── Backdrop ─────────────────────────────────────────────────────── */
+
+#rita-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.2s ease;
+  z-index: 9997;
+}
+#rita-backdrop.is-open {
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+/* ─── Floating window ──────────────────────────────────────────────── */
+
+#rita-panel {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  bottom: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: var(--rita-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--rita-text);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--rita-window-shadow);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(20px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+#rita-panel * {
+  box-sizing: border-box;
+}
+#rita-panel.is-open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--rita-blue-start) 0%, var(--rita-blue-end) 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-title .panel-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  object-fit: cover;
+  object-position: top;
+}
+
+.panel-title-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.panel-title-text .panel-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.panel-title-text .panel-name::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rita-online);
+  box-shadow: 0 0 8px var(--rita-online);
+  flex-shrink: 0;
+}
+
+.panel-title-text .panel-subtitle {
+  font-size: 12px;
+  opacity: 0.88;
+  margin-top: 1px;
+}
+
+#rita-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: 0;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+#rita-close:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+#rita-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+@media (max-width: 480px) {
+  #rita-panel {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  #rita-fab {
+    right: 16px;
+    bottom: 16px;
+  }
+}
