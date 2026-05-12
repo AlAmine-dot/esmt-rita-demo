@@ -21,6 +21,10 @@ html, body {
   color: var(--rita-text);
   background: #fff;
   overflow-x: hidden;
+  /* Empêche le geste "back" trackpad/touch (swipe horizontal) de naviguer
+     vers la page précédente. Indispensable sur Opera/Chrome où un overscroll
+     ou un swipe à 2 doigts est interprété comme history.back. */
+  overscroll-behavior: none;
 }
 
 /* Masque la scrollbar native du body : on en affiche une custom (cf.
@@ -341,6 +345,10 @@ html::-webkit-scrollbar {
   width: 100%;
   border: 0;
   background: #fff;
+  /* Defense en profondeur contre le geste "back" — n'agit que si le geste
+     traverse jusqu'au parent (l'iframe Flutter cross-origin doit aussi
+     déclarer overscroll-behavior chez elle pour bloquer à la source). */
+  overscroll-behavior: contain;
 }
 
 /* ─── Mobile fullscreen ────────────────────────── */

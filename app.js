@@ -235,9 +235,29 @@
     frameLoaded = true;
   }
 
+  // Décharge le contenu de l'iframe (= tue Flutter) pour libérer les couches
+  // compositor/WebGL qui, même une fois le panneau caché (display:none ou
+  // opacity:0), continuent à interférer avec le scroll natif de la page hôte
+  // sur iOS Safari et certains Chromium. À la prochaine ouverture, loadFrame
+  // rechargera l'app (1-2s de latence).
+  function unloadFrame() {
+    if (!frameLoaded) return;
+    ritaFrame.src = 'about:blank';
+    frameLoaded = false;
+  }
+
+  function isMobileViewport() {
+    return window.matchMedia('(max-width: 1024px)').matches;
+  }
+
   let savedScrollY = 0;
 
   function lockBodyScroll() {
+    // Sur mobile/tablette le pop-up est plein écran → le body en dessous est
+    // invisible et hors d'atteinte tactile. Inutile de figer son scroll, et
+    // ça évite la danse position:fixed ↔ static qui perturbe Elementor sur
+    // breedj (auto-scroll visible + handlers de scroll cassés).
+    if (isMobileViewport()) return;
     savedScrollY = window.scrollY || window.pageYOffset || 0;
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
@@ -247,6 +267,7 @@
   }
 
   function unlockBodyScroll() {
+    if (isMobileViewport()) return;
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -284,6 +305,10 @@
     panel.setAttribute('aria-hidden', 'true');
     fab.setAttribute('aria-expanded', 'false');
     unlockBodyScroll();
+    // Libère réellement l'iframe Flutter : display:none ne suffit pas à
+    // décharger son contentDocument, le runtime Flutter resterait actif
+    // en mémoire et continuerait à interférer avec le scroll natif.
+    unloadFrame();
   }
 
   fab.addEventListener('click', () => {
@@ -326,11 +351,14 @@
     setTimeout(showTeaser, TEASER_DELAY);
   }
   if (document.readyState === 'complete') {
-    schedulePreload();
+    /* schedulePreload();  ← DÉSACTIVÉ : l'iframe Flutter préchargée
+       bloque le scroll natif tant qu'elle est rendue dans un panneau
+       large (cf. test 5d-2 du 12/05). On la charge maintenant à la
+       demande dans openPanel(). 1-2s de latence à la 1ère ouverture. */
     scheduleTeaser();
   } else {
     window.addEventListener('load', () => {
-      schedulePreload();
+      /* schedulePreload();  ← idem */
       scheduleTeaser();
     }, { once: true });
   }
