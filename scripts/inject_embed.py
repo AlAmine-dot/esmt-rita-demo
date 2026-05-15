@@ -55,10 +55,17 @@ LEGACY_CSS_LINK_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Matche le bloc HTML widget legacy : depuis "<!-- ... Widget Rita ..." jusqu'à
-# la balise fermante "</aside>" inclus. Capture multi-ligne.
+# Matche le bloc HTML widget legacy : depuis le commentaire SÉPARATEUR body
+# "<!-- ─── Widget Rita ─── -->" jusqu'à </aside> (close du #rita-panel).
+#
+# ⚠️ Le ─ (caractère box-drawing U+2500) est OBLIGATOIRE dans le pattern.
+# Sans lui, la regex matchait aussi le commentaire du <head>
+# "<!-- Widget Rita/Khady (injecté par-dessus le clone Bakeli) -->" et
+# gobait TOUT le contenu Bakeli entre les deux comments jusqu'au premier
+# </aside> du body (bug 2026-05-15). Le ─ n'est jamais utilisé dans le head
+# comment, c'est notre disambiguation.
 LEGACY_WIDGET_HTML_PATTERN = re.compile(
-    r'<!--[^<]*Widget Rita[\s\S]*?</aside>\s*',
+    r'<!--\s*─[─\s]*Widget Rita[\s\S]*?</aside>\s*',
     re.IGNORECASE,
 )
 
