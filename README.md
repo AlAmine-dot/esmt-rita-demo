@@ -1,11 +1,23 @@
-# ESMT Rita Demo + multi-tenant clones
+# esmt-rita-demo — Clones de sites prospects + démo musée ESMT
 
 Repo qui héberge :
-- **Le clone statique d'ESMT** + sa démo Rita historique (`index.html` racine, "musée").
-- **Les clones des sites de prospects** (Bakeli, Breedj, futurs Volkeno, etc.) — chacun intègre désormais l'agent IA Yeekai via le nouveau pattern `embed.js` standalone.
-- **Le script d'injection** `scripts/inject_embed.py` qui automatise l'ajout du widget Yeekai à tout clone fraîchement wgetté.
+- **Les clones wget des sites de prospects** (Bakeli, Breedj, Le Grand Frère, Afrodemy…) — chacun intègre l'agent IA Yeekai via 1 script tag pointant vers `yeekai-embed-js` (CDN).
+- **Le script d'injection** `scripts/inject_embed.py` qui automatise l'ajout du widget Yeekai dans tous les HTML d'un clone fraîchement wgetté (idempotent).
+- **Le clone statique d'ESMT** + sa démo Rita historique (`index.html` racine, "musée" — pattern legacy intact pour référence).
 
 L'embed JS lui-même ne vit PAS ici (il est dans le repo séparé [`yeekai-embed-js`](https://github.com/AlAmine-dot/yeekai-embed-js), déployé sur Vercel à `https://yeekai-embed-js.vercel.app/v1/embed.js`).
+
+Un repo parmi 5 dans l'écosystème Yeekai — cf [`yeebot-2.0/ECOSYSTEM.md`](https://github.com/AlAmine-dot/yeebot-2.0/blob/yeebot-v2/ECOSYSTEM.md) pour la vue d'ensemble.
+
+---
+
+## Démarrage rapide
+
+| Tu es... | Lis en premier |
+|---|---|
+| **CTO / nouveau dev** sur l'écosystème complet | [`yeebot-2.0/ECOSYSTEM.md`](https://github.com/AlAmine-dot/yeebot-2.0/blob/yeebot-v2/ECOSYSTEM.md) puis [`ONBOARDING.md`](ONBOARDING.md) |
+| **Dev** qui veut comprendre le pattern clone + injection | [`ONBOARDING.md`](ONBOARDING.md) directement |
+| Tu veux **ajouter un nouveau clone prospect** | [`templates/SCAFFOLD_TENANT_CLONE.md`](templates/SCAFFOLD_TENANT_CLONE.md) |
 
 ---
 
