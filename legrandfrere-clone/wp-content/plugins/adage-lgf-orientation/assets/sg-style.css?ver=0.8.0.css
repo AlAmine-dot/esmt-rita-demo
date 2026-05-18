@@ -1,0 +1,357 @@
+/* ===== Preambule & Layout ===== */
+
+body, .sg-intro, #swipe-game-wrapper, .swipe-buttons button, .sg-card {
+  font-family: var(--e-global-typography-primary-font-family, "Fira Sans"), sans-serif;
+  color: var(--e-global-color-text, #555555);
+}
+
+.sg-intro {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, #ffffff, var(--e-global-color-01c7ffc, #F3F3F3));
+  border: 4px solid var(--e-global-color-secondary);
+  border-radius: 0;
+  box-shadow: 0 6px 18px rgba(20, 100, 161, 0.12);
+}
+
+.sg-intro h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.35rem;
+  color: var(--e-global-color-primary, #1464A1);
+  font-family: var(--e-global-typography-secondary-font-family, "Merriweather Sans"), sans-serif;
+}
+
+.sg-intro p {
+  margin: 8px 0;
+  color: var(--e-global-color-text, #555555);
+  line-height: 1.5;
+}
+
+.sg-intro ul {
+  margin: 6px 0 12px 18px;
+  padding: 0;
+  color: var(--e-global-color-text, #555555);
+}
+
+.sg-intro li { margin: 6px 0; }
+
+.sg-intro .sg-intro-closing {
+  font-weight: 700;
+  color: var(--e-global-color-primary, #1464A1);
+}
+
+.sg-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 15px 30px 15px 30px;
+  border-radius: 0px 0px 0px 0px;
+  border: 4px solid var(--e-global-color-primary, #1464A1);
+  background: var(--e-global-color-01c7ffc, #F3F3F3);
+  color: var(--e-global-color-primary, #1464A1);
+  font-size: 1.05rem;
+  font-family: var(--e-global-typography-accent-font-family, "Fira Sans"), sans-serif;
+  font-weight: var(--e-global-typography-accent-font-weight, 700);
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(20, 100, 161, 0.14);
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.sg-start-btn:hover {
+  transform: translateY(-1px);
+  background: var(--e-global-color-secondary, #5DC1CC);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(20, 100, 161, 0.18);
+}
+
+.sg-hidden { display: none !important; }
+
+/* ===== Swipe Game – Deck ===== */
+
+#swipe-game-app.tinder {
+  position: relative;
+  width: min(420px, 100%);
+  height: 420px;
+  margin: 24px auto;
+  user-select: none;
+  touch-action: none;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.sg-progress {
+  max-width: min(420px, 100%);
+  margin: 0 auto 14px;
+  padding: 0 6px;
+}
+
+.sg-progress-label {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.95rem;
+  color: var(--e-global-color-text, #555555);
+  margin-bottom: 6px;
+}
+
+.sg-progress-track {
+  height: 10px;
+  width: 100%;
+  background: var(--e-global-color-01c7ffc, #F3F3F3);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.sg-progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--e-global-color-primary, #1464A1), var(--e-global-color-secondary, #5DC1CC));
+  border-radius: 999px;
+  transition: width .2s ease;
+}
+
+#swipe-game-cards {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  contain: layout paint;
+}
+
+/* Cartes */
+.sg-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background-color: var(--e-global-color-primary, #1464A1);
+  background-image: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /*box-shadow: 0px 10px 24px rgba(20, 100, 161, 0.12);*/
+  border: 4px solid var(--e-global-color-secondary);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  padding: 2.2rem 2rem;
+  line-height: 1.6;
+  font-family: inherit;
+  text-align: center;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transform: translateZ(0);
+  transition: box-shadow .2s ease, transform .2s ease;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  cursor: grab;
+}
+
+.sg-card.sg-card-has-bg {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+  text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.45), 2px -2px 2px rgba(0, 0, 0, 0.45), -2px 2px 2px rgba(0, 0, 0, 0.45), -2px -2px 2px rgba(0, 0, 0, 0.45);
+  font-weight: 700;
+}
+
+.sg-card:active {
+  cursor: grabbing;
+}
+
+#swipe-game-cards .sg-card:not(:first-child) {
+  pointer-events: none;
+  box-shadow: none;
+}
+
+#swipe-game-cards .sg-card:nth-child(n+3) {
+  background-image: none !important;
+}
+
+/* Boutons */
+.swipe-buttons {
+  text-align: center;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.swipe-buttons button {
+  background: var(--e-global-color-01c7ffc, #F3F3F3);
+  font-size: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+  box-shadow: 0 8px 22px rgba(20, 100, 161, 0.12);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.swipe-buttons button.vote{
+  font-size: 2rem;
+  padding: .5rem 1rem !important;
+}
+
+.swipe-buttons button:hover {
+  background: var(--e-global-color-secondary, #5DC1CC);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(20, 100, 161, 0.18);
+}
+
+.sg-extend {
+  max-width: 720px;
+  margin: 18px auto;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(20, 100, 161, 0.14);
+  box-shadow: 0 6px 18px rgba(20, 100, 161, 0.08);
+  text-align: center;
+  border-radius: 12px;
+}
+.sg-extend h3 { margin-top: 0; }
+
+.sg-completion-msg {
+  text-align: center;
+  font-weight: 700;
+  color: var(--e-global-color-primary, #1464A1);
+}
+
+/* ===== Résultats ===== */
+
+.sg-title {
+  margin-top: 2rem;
+  font-size: 1.4rem;
+  color: var(--e-global-color-primary, #1464A1);
+  text-align: center;
+}
+
+/* Bloc Conseils en tête */
+.sg-advice {
+  max-width: 980px;
+  margin: 16px auto 0;
+  background: #ffffff;
+  border: 1px solid rgba(20, 100, 161, 0.14);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 18px rgba(20, 100, 161, 0.08);
+}
+.sg-advice-item { margin: 6px 0 10px; }
+.sg-advice-item strong { display: inline-block; color: var(--e-global-color-primary, #1464A1); }
+.sg-advice-text { color: var(--e-global-color-text, #555555); white-space: normal; line-height:1.3;}
+
+/* Grille : chart gauche / liste droite */
+.sg-results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  max-width: 980px;
+  margin: 16px auto;
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .sg-results-grid { grid-template-columns: 1fr; }
+}
+
+.sg-block-title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--e-global-color-primary, #1464A1);
+}
+
+/* Chart */
+.sg-chart-wrap {
+  background: #fff;
+  border: 1px solid rgba(20, 100, 161, 0.14);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(20, 100, 161, 0.08);
+}
+.sg-chart-google { min-height: 260px; width: 100%; }
+.sg-chart-legend {
+  margin: 10px 8px 4px;
+  font-size: 12px;
+  color: var(--e-global-color-text, #555555);
+  line-height: 1.4;
+}
+.sg-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  margin-bottom: 6px;
+}
+.sg-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sg-legend-code {
+  display: inline-block;
+  min-width: 22px;
+  font-weight: 700;
+  color: var(--e-global-color-primary, #1464A1);
+}
+.sg-legend-code.sg-negative {
+  color: var(--e-global-color-accent, #EC673F);
+}
+.sg-legend-label {
+  color: var(--e-global-color-text, #555555);
+  font-weight: 400;
+}
+.sg-chart-legend-codes {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--e-global-color-primary, #1464A1);
+}
+.sg-chart-tooltip {
+  padding: 6px 8px;
+  color: #202124;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Liste métiers */
+.sg-metiers-list {
+  list-style: decimal;
+  margin: 0;
+  padding-left: 18px;
+}
+.sg-metiers-list li {
+  margin: 8px 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.sg-metiers-list a {
+  flex: 1;
+  text-decoration: none;
+  color: var(--e-global-color-primary, #1464A1);
+  background: #f8f9fa;
+  border: 1px solid rgba(20, 100, 161, 0.14);
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: transform .15s, background .15s;
+}
+.sg-metiers-list a:hover { transform: translateY(-1px); background: var(--e-global-color-01c7ffc, #F3F3F3); }
+.sg-badge {
+  display: inline-block;
+  min-width: 72px;
+  padding: 4px 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 400;
+  color: #fff;
+  background: var(--e-global-color-primary, #1464A1);
+  border-radius: 20px;
+}
+
+.sg-metier-points {
+  display: inline-block;
+  font-size: 13px;
+  color: #4a5568;
+}
