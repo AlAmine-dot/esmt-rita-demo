@@ -62,6 +62,26 @@ Reste sur l'ancien pattern (`config.js` + `app.js` + `styles.css` + iframe wrapp
 
 ---
 
+## Clones disponibles
+
+| Slug | Site cible | HTML | Taille | Status | URL Pages |
+|---|---|---|---|---|---|
+| `esmt` (musée) | [esmt.sn](https://www.esmt.sn) | — | — | Pattern legacy, intact comme exemple historique | [Pages](https://alamine-dot.github.io/esmt-rita-demo/) |
+| `bakeli` | [bakeli.tech](https://www.bakeli.tech) | 228 | ~40 Mo | ✅ Tenant en DB, agent Khady opérationnel | [Pages](https://alamine-dot.github.io/esmt-rita-demo/bakeli-clone/) |
+| `breedj` | [breedj.com](https://www.breedj.com) | 1454 | ~959 Mo | ✅ Tenant en DB, front IA opérationnel | [Pages](https://alamine-dot.github.io/esmt-rita-demo/breedj-clone/) |
+| `legrandfrere` | [legrandfrere.africa](https://legrandfrere.africa) | 871 | ~484 Mo | 🟡 Pré-cloné, attente POC complet (commit local seulement) | — |
+| `afrodemy` | [afrogroup-sn.com/fr](https://afrogroup-sn.com/fr) | 3 | ~4.3 Mo | 🟡 Pré-cloné (SPA Next.js, wget partiel), attente POC complet | [Pages](https://alamine-dot.github.io/esmt-rita-demo/afrodemy-clone/) |
+
+**Légende status** :
+- ✅ Tenant provisionné en DB Supabase + front IA shippé → widget fonctionnel
+- 🟡 Pré-clone shippé, en attente du tenant côté backend / front IA
+
+**Notes spéciales** :
+- `afrodemy` : site Next.js avec SSR partiel. wget n'a chopé que la home + page register parce que le routing interne est client-side. Suffisant pour la démo visuelle. Pour exploration profonde du site, prévoir Playwright headless (Phase 3).
+- `legrandfrere` : 484 Mo, commit local non-pushé pour ne pas saturer GitHub. Disponible en local pour la démo cold reach.
+
+---
+
 ## Ajouter une nouvelle démo de prospect
 
 ```bash
@@ -154,9 +174,12 @@ L'embed JS est **séparément** déployé sur Vercel via le repo [`yeekai-embed-
 
 | Branche | Usage |
 |---|---|
-| `main` | État stable, suivi par Vercel auto-deploy |
-| `safety/pre-subsprint-d-2026-05` | Filet de rollback avant la migration Sub-sprint D |
-| `feat/subsprint-d-migrate-to-standalone-embed` | Branche de travail Sub-sprint D |
+| `main` | État stable, suivi par Vercel + GitHub Pages auto-deploy |
+| `safety/pre-subsprint-d-2026-05` | Rollback avant la migration Sub-sprint D (embed standalone) |
+| `safety/pre-clone-afrodemy-2026-05` | Rollback avant le pré-clone Afrodemy |
+| `feat/subsprint-d-migrate-to-standalone-embed` | Travail Sub-sprint D (mergé sur main) |
+| `feat/poc-legrandfrere-clone` | Pré-clone Le Grand Frère (local seulement, 484 Mo non-pushé) |
+| `feat/pre-clone-afrodemy` | Pré-clone Afrodemy (mergé sur main) |
 
 ---
 
