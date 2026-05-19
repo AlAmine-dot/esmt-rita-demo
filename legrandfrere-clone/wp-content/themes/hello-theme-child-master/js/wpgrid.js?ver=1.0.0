@@ -1,0 +1,137 @@
+window.WP_Grid_Builder && WP_Grid_Builder.on('init', function (wpgb) {
+
+	if (!wpgb.facets) {
+		return;
+	}
+	
+	wpgb.facets.on('loaded', function (facets) {
+		if (facets.hasOwnProperty(19) === true) {
+			if (facets[19][0].html === '') {
+				jQuery('.wpgb-facet.wpgb-facet-19').parent().parent().hide();
+			}
+		}
+	});
+});
+
+// Suivi GA4 : recherche libre (facet id 17) via gtag
+window.WP_Grid_Builder && WP_Grid_Builder.on('init', function (wpgb) {
+	if (!wpgb || !wpgb.facets) {
+		return;
+	}
+
+	if (window.__wpgbSearchTrackingBound) {
+		return;
+	}
+
+	window.__wpgbSearchTrackingBound = true;
+
+	var facetId = 17;
+	var selector = '.wpgb-facet-' + facetId + ' input[type="search"], .wpgb-facet-' + facetId + ' input[type="text"]';
+	var lastValue = '';
+
+	function sendSiteSearch(value) {
+		if (!value || value === lastValue) {
+			return;
+		}
+
+		lastValue = value;
+
+		window.dataLayer = window.dataLayer || [];
+		window.dataLayer.push({
+			event: 'site_search',
+			search_term: value,
+			site_search: value,
+			context: window.pageContext || null
+		});
+
+		if (typeof window.gtag === 'function') {
+			window.gtag('event', 'site_search', {
+				search_term: value,
+				site_search: value
+			});
+		}
+	}
+
+	jQuery(document).on('change', selector, function () {
+		var value = jQuery(this).val();
+		sendSiteSearch(jQuery.trim(value));
+	});
+
+	jQuery(document).on('keydown', selector, function (event) {
+		if (event.key === 'Enter') {
+			var value = jQuery(this).val();
+			sendSiteSearch(jQuery.trim(value));
+		}
+	});
+});
+
+// Ne pas toucher au double-clic gauche (doubleClickZoom natif).
+// On ajoute un "double-clic droit" qui dézoome.
+
+window.WP_Grid_Builder && WP_Grid_Builder.on('init', function (wpgb) {
+  if (!wpgb || !wpgb.facets) return;
+
+  wpgb.facets.on('map.afterInit', function (instance) {
+    var map = instance.map;
+    if (!map) return;
+
+    var container = map.getContainer();
+
+    // Empêche l’ouverture du menu contextuel (sinon pas de double clic droit possible)
+    if (window.L && L.DomEvent) {
+      L.DomEvent.on(container, 'contextmenu', function (ev) {
+        L.DomEvent.preventDefault(ev);
+        L.DomEvent.stop(ev);
+      }, map);
+    } else {
+      container.addEventListener('contextmenu', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+      });
+    }
+
+    // Détection d’un double clic droit : deux clics bouton 2 rapprochés et au même endroit
+    var lastRightTime = 0;
+    var lastRightPos = null;
+    var delayMs = 350;     // fenêtre temporelle pour considérer "double"
+    var maxDist = 6;       // tolérance en px
+
+    function isDoubleRight(now, x, y) {
+      if (!lastRightPos) return false;
+      var dt = now - lastRightTime;
+      var dx = x - lastRightPos.x;
+      var dy = y - lastRightPos.y;
+      return dt <= delayMs && (dx*dx + dy*dy) <= (maxDist*maxDist);
+    }
+
+    function onMouseDown(ev) {
+      // bouton 2 = clic droit
+      if ((ev.button || ev.which) !== 2) return;
+
+      var now = Date.now();
+      var x = ev.clientX, y = ev.clientY;
+
+      if (isDoubleRight(now, x, y)) {
+        // On a un "double-clic droit" => dézoomer
+        if (window.L && L.DomEvent) {
+          L.DomEvent.preventDefault(ev);
+          L.DomEvent.stop(ev);
+        } else {
+          ev.preventDefault(); ev.stopPropagation();
+        }
+        map.zoomOut(1, { animate: true });
+        // reset pour éviter triple-clics pris comme doubles consécutifs
+        lastRightTime = 0; lastRightPos = null;
+      } else {
+        lastRightTime = now;
+        lastRightPos = { x: x, y: y };
+      }
+    }
+
+    // On attache en **capture** pour passer avant d’éventuels autres handlers
+    if (window.L && L.DomEvent) {
+      L.DomEvent.on(container, 'mousedown', onMouseDown, map, /*useCapture*/ true);
+    } else {
+      container.addEventListener('mousedown', onMouseDown, true);
+    }
+  });
+});

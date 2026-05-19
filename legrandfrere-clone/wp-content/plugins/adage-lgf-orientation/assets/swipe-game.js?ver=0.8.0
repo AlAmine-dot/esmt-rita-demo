@@ -1,0 +1,1436 @@
+/**
+ * Swipe Orientation Game – Front
+ * Version: 0.8.0
+ */
+
+(function () {
+  'use strict';
+
+  if (typeof SwipeGame === 'undefined') return;
+
+  // ===== Helpers =====
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $all = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  // ===== Config / State =====
+  const apiRoot  = SwipeGame.rest_url;
+  const headers  = { 'X-WP-Nonce': SwipeGame.nonce, 'Content-Type': 'application/json' };
+  const isLoggedIn = !!SwipeGame.is_logged_in;
+  const canViewResults = SwipeGame.can_view_results !== false;
+  const shouldOfferForm = SwipeGame.should_offer_form === true;
+  const hasValidationRedirect = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('validated') === '1';
+    } catch (err) {
+      return false;
+    }
+  })();
+  const canReadStorage = !isLoggedIn || hasValidationRedirect;
+  const canWriteStorage = !isLoggedIn;
+  const canRemoveStorage = !isLoggedIn || hasValidationRedirect;
+  const CAT_CODES = ['A','E','I','M','N','C','S','T']; // ordre d'affichage
+  const scores = CAT_CODES.reduce((acc,c)=> (acc[c]=0, acc), {});
+  const occurrences = CAT_CODES.reduce((acc,c)=> (acc[c]=0, acc), {});
+  const threshold   = 110;
+  const outDistance = 1.4;
+  const initialBatchSize = Math.max(1, Number(SwipeGame.initial_questions) || 50);
+  const extraBatchSize = initialBatchSize;
+  const answeredIds = new Set();
+  const activityScores = [];
+
+  let activeCard = null;
+  let pointerId  = null;
+  let startX = 0, startY = 0, currentX = 0, currentY = 0;
+  let dragRafId = 0;
+  let pendingDx = 0;
+  let pendingDy = 0;
+  let pendingRotate = 0;
+  let hasStarted = false;
+  let isSubmitting  = false;
+  let isAnimating = false;
+  let totalCards = 0;
+  let activityStack = [];
+  let totalAvailableActivities = 0;
+  let answeredTotal = 0;
+  let deckHandlersReady = false;
+  let progressTargetTotal = 0;
+  let pendingCards = [];
+  let savedProgress = null;
+  let shouldShowSavedPrompt = false;
+
+  const L = (() => {
+    const candidate = window.SwipeGameLogger || window.SGLogger || window.L;
+    const fallback = {
+      info: (...args) => console.info('[SwipeGame]', ...args),
+      warn: (...args) => console.warn('[SwipeGame]', ...args),
+      error: (...args) => console.error('[SwipeGame]', ...args)
+    };
+    return {
+      info: typeof candidate?.info === 'function' ? candidate.info.bind(candidate) : fallback.info,
+      warn: typeof candidate?.warn === 'function' ? candidate.warn.bind(candidate) : fallback.warn,
+      error: typeof candidate?.error === 'function' ? candidate.error.bind(candidate) : fallback.error
+    };
+  })();
+
+  const hasDeck = !!$('#swipe-game-cards');
+  const intro   = $('#swipe-game-intro');
+  const wrapper = $('#swipe-game-wrapper');
+  if (!hasDeck) {
+    return;
+  }
+
+  const STORAGE_KEY = 'swipeGameProgressV1';
+  const STORAGE_RESULT_KEY = 'swipeGameResultV1';
+
+  function safeLocalStorageGet(key) {
+    if (!canReadStorage) return null;
+    try {
+      return window.localStorage?.getItem(key) || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function safeLocalStorageSet(key, value) {
+    if (!canWriteStorage) return;
+    try {
+      window.localStorage?.setItem(key, value);
+    } catch (err) {
+      // ignore storage errors (private mode, quota, etc.)
+    }
+  }
+
+  function safeLocalStorageRemove(key) {
+    if (!canRemoveStorage) return;
+    try {
+      window.localStorage?.removeItem(key);
+    } catch (err) {
+      // ignore storage errors
+    }
+  }
+
+  function loadSavedProgress() {
+    const raw = safeLocalStorageGet(STORAGE_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!Array.isArray(parsed.answered_ids) || !parsed.answered_ids.length) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveProgress(stage) {
+    if (isLoggedIn) return;
+    const payload = {
+      stage,
+      answered_ids: Array.from(answeredIds),
+      answered_total: answeredTotal,
+      scores: { ...scores },
+      occurrences: { ...occurrences },
+      activity_scores: activityScores.slice(),
+      total_available: totalAvailableActivities,
+      saved_at: Date.now()
+    };
+    safeLocalStorageSet(STORAGE_KEY, JSON.stringify(payload));
+  }
+
+  function clearProgress() {
+    safeLocalStorageRemove(STORAGE_KEY);
+  }
+
+  function loadSavedResult() {
+    const raw = safeLocalStorageGet(STORAGE_RESULT_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!parsed.scores || !parsed.metiers) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveResult(payload) {
+    if (isLoggedIn) return;
+    safeLocalStorageSet(STORAGE_RESULT_KEY, JSON.stringify(payload));
+  }
+
+  function clearResult() {
+    safeLocalStorageRemove(STORAGE_RESULT_KEY);
+  }
+
+  function applySavedProgress(saved) {
+    if (!saved || !Array.isArray(saved.answered_ids)) return;
+    answeredIds.clear();
+    saved.answered_ids.forEach(id => {
+      if (id === null || typeof id === 'undefined') return;
+      answeredIds.add(String(id));
+    });
+    answeredTotal = typeof saved.answered_total === 'number' ? saved.answered_total : answeredIds.size;
+
+    CAT_CODES.forEach(code => {
+      if (saved.scores && Object.prototype.hasOwnProperty.call(saved.scores, code)) {
+        scores[code] = Number(saved.scores[code]) || 0;
+      }
+      if (saved.occurrences && Object.prototype.hasOwnProperty.call(saved.occurrences, code)) {
+        occurrences[code] = Number(saved.occurrences[code]) || 0;
+      }
+    });
+
+    activityScores.length = 0;
+    if (Array.isArray(saved.activity_scores)) {
+      saved.activity_scores.forEach(entry => {
+        if (!entry) return;
+        const id = Number(entry.id) || null;
+        const cats = Array.isArray(entry.categories)
+          ? entry.categories.map(c => String(c || '').toUpperCase()).filter(Boolean)
+          : [];
+        const score = typeof entry.score === 'number' ? entry.score : Number(entry.score) || 0;
+        if (!id || !cats.length) return;
+        activityScores.push({ id, categories: cats, score });
+      });
+    }
+  }
+
+  function buildAnsweredSummary(answeredCount, total = null) {
+    const safeCount = Math.max(0, Number(answeredCount) || 0);
+    const plural = safeCount > 1 ? 's' : '';
+
+    if (typeof total === 'number' && total > 0) {
+      return `Vous avez répondu à ${safeCount} question${plural} sur ${total}.`;
+    }
+
+    return `Vous avez répondu à ${safeCount} question${plural}.`;
+  }
+
+  function recordActivityScore(cardId, categories, direction) {
+    const id = Number(cardId) || null;
+    const cats = Array.isArray(categories) ? categories.map(c => String(c || '').toUpperCase()).filter(Boolean) : [];
+    if (!id || !cats.length) return;
+
+    const uniqueCats = Array.from(new Set(cats));
+    const score = direction > 0 ? 2 : (direction < 0 ? -1 : 0);
+    const payload = { id, categories: uniqueCats, score };
+
+    const existingIndex = activityScores.findIndex(entry => entry.id === id);
+    if (existingIndex >= 0) {
+      activityScores[existingIndex] = payload;
+    } else {
+      activityScores.push(payload);
+    }
+  }
+
+  function formatPoints(value) {
+    if (typeof value !== 'number' || Number.isNaN(value)) return null;
+    const precision = Math.abs(value) >= 10 ? 1 : 2;
+    return Number(value.toFixed(precision));
+  }
+
+  // ===== API =====
+  function ensureStartOnce() {
+    if (hasStarted) return;
+    hasStarted = true;
+    L.info('Start marker sent');
+    fetch(`${apiRoot}start`, { method: 'POST', headers }).catch(L.error);
+  }
+
+  // ===== UI mount / wiring =====
+  function injectButtons() {
+    if ($('#swipe-like-btn')) return;
+    const result = $('#swipe-game-result');
+    if (!result || !result.parentNode) return;
+
+    const container = document.createElement('div');
+    container.className = 'swipe-buttons';
+    container.innerHTML = `
+      <button id="swipe-dislike-btn" class="vote" type="button" aria-label="👎🏿 Je n'aime pas" title="Je n'aime pas">👎🏿</button>
+      <button id="swipe-pass-btn"    class="vote" type="button" aria-label="🤷🏿 Je ne sais pas / Je ne suis pas sûr·e" title="Je ne sais pas / Je ne suis pas sûr·e">🤷🏿</button>
+      <button id="swipe-like-btn"    class="vote" type="button" aria-label="👍🏿 J'aime" title="J'aime">👍🏿</button>
+    `;
+    result.parentNode.insertBefore(container, result);
+  }
+
+  function injectProgress() {
+    if ($('#sg-progress')) return;
+    const app = $('#swipe-game-app');
+    if (!app || !app.parentNode) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'sg-progress';
+    wrap.className = 'sg-progress sg-hidden';
+    wrap.innerHTML = `
+      <div class="sg-progress-label">
+        <span id="sg-progress-count">0/0</span>
+      </div>
+      <div class="sg-progress-track" aria-hidden="true">
+        <div class="sg-progress-bar" id="sg-progress-bar"></div>
+      </div>
+    `;
+    app.insertAdjacentElement('afterend', wrap);
+  }
+
+  function updateProgress() {
+    const wrap = $('#sg-progress');
+    const bar = $('#sg-progress-bar');
+    const counter = $('#sg-progress-count');
+    const remaining = getRemainingCount();
+    const stackTotal = Math.max(progressTargetTotal || (answeredTotal + remaining), 1);
+    const progressCount = Math.min(answeredTotal + 1, stackTotal);
+    const ratio = Math.min(1, Math.max(0, progressCount / stackTotal));
+
+    if (counter) counter.textContent = `${progressCount}/${stackTotal}`;
+    if (bar) bar.style.width = `${ratio * 100}%`;
+    if (wrap) wrap.classList.toggle('sg-hidden', totalCards === 0);
+  }
+
+  function setButtonsDisabled(disabled) {
+    ['#swipe-like-btn','#swipe-dislike-btn','#swipe-pass-btn'].forEach(sel=>{
+      const b = $(sel); if (b) b.disabled = disabled;
+    });
+  }
+
+  function hideIntro() {
+    if (intro) intro.classList.add('sg-hidden');
+  }
+
+  function revealWrapper() {
+    if (wrapper) wrapper.classList.remove('sg-hidden');
+  }
+
+  function wireIntroGate() {
+    if (!intro) {
+      L.info('Intro missing, auto-revealing wrapper');
+      revealWrapper();
+      return;
+    }
+
+    const hasAnswered = SwipeGame.has_answered
+      || (savedProgress && savedProgress.answered_ids && savedProgress.answered_ids.length > 0);
+    if (hasAnswered) {
+      L.info('User already answered, skipping intro');
+      hideIntro();
+      revealWrapper();
+      return;
+    }
+
+    const startBtn = $('#swipe-start-btn', intro);
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        L.info('Start button clicked');
+        hideIntro();
+        revealWrapper();
+        $('#swipe-game-app')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    } else {
+      L.warn('Start button missing, auto-revealing wrapper');
+      hideIntro();
+      revealWrapper();
+    }
+  }
+
+  function topCardElement() {
+    const wrap = $('#swipe-game-cards');
+    if (!wrap) return null;
+    const els = $all('.sg-card', wrap);
+    return els.length ? els[0] : null;
+  }
+
+  function setZIndices() {
+    const wrap = $('#swipe-game-cards');
+    if (!wrap) return;
+    const cards = $all('.sg-card', wrap);
+    const total = cards.length;
+    cards.forEach((c, i) => c.style.zIndex = 100 + (total - i));
+  }
+
+  function getRemainingCount() {
+    const wrap = $('#swipe-game-cards');
+    const mounted = wrap ? $all('.sg-card', wrap).length : 0;
+    return mounted + pendingCards.length;
+  }
+
+  function createCardElement(card) {
+    const el = document.createElement('div');
+    el.className = 'sg-card';
+
+    const cats = Array.isArray(card.categories)
+      ? card.categories
+      : (card.category ? [card.category] : []);
+    const catsUpper = cats.map(c => String(c).toUpperCase()).filter(Boolean);
+
+    el.dataset.id   = card.id || '';
+    el.dataset.cat  = catsUpper[0] || '';
+    el.dataset.cats = JSON.stringify(catsUpper);
+    el.innerHTML = `${card.title}`;
+
+    if (card.image) {
+      el.style.backgroundImage = `linear-gradient(135deg, rgba(20,100,161,0.32), rgba(0,0,0,0.32)), url('${card.image}')`;
+      el.classList.add('sg-card-has-bg');
+    }
+
+    return el;
+  }
+
+  function appendNextCard() {
+    const wrapper = $('#swipe-game-cards');
+    if (!wrapper || pendingCards.length === 0) return;
+    const nextCard = pendingCards.shift();
+    const el = createCardElement(nextCard);
+    wrapper.appendChild(el);
+    setZIndices();
+  }
+
+  function clearResultsContainer() {
+    const box = $('#swipe-game-result');
+    if (box) box.innerHTML = '';
+  }
+
+  function renderFormGateMessage(formId) {
+    const box = $('#swipe-game-result');
+    if (box) {
+      box.innerHTML = `<p class="sg-completion-msg">Pour accéder à tes résultats, tu dois être connecté et avoir soumis le formulaire obligatoire (id ${formId}).</p>`;
+    }
+  }
+
+  function normalizeStyleEntry(entry) {
+    if (!entry) return {};
+    if (typeof entry === 'string') return { src: entry };
+    return entry;
+  }
+
+  function appendInlineStyle(handle, inline) {
+    if (!inline) return;
+    const styles = Array.isArray(inline) ? inline : [inline];
+    const text = styles.filter(Boolean).join('\n');
+    if (!text) return;
+    const key = handle || text;
+    const existing = document.querySelector(`style[data-sg-inline-handle="${key}"]`);
+    if (existing) return;
+    const style = document.createElement('style');
+    style.dataset.sgFormAsset = '1';
+    style.dataset.sgInlineHandle = key;
+    style.textContent = text;
+    document.head.appendChild(style);
+  }
+
+  function ensureStylesLoaded(entries = []) {
+    const tasks = entries.map((entry) => new Promise((resolve, reject) => {
+      const styleEntry = normalizeStyleEntry(entry);
+      const url = styleEntry.src;
+      const inline = styleEntry.inline;
+      if (!url) {
+        appendInlineStyle(styleEntry.handle, inline);
+        resolve();
+        return;
+      }
+      const existing = document.querySelector(`link[href="${url}"]`);
+      if (existing) {
+        appendInlineStyle(styleEntry.handle || url, inline);
+        resolve();
+        return;
+      }
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = url;
+      link.dataset.sgFormAsset = '1';
+      link.onload = () => {
+        appendInlineStyle(styleEntry.handle || url, inline);
+        resolve();
+      };
+      link.onerror = () => reject(new Error(`Failed to load ${url}`));
+      document.head.appendChild(link);
+    }));
+
+    return Promise.all(tasks);
+  }
+
+  function normalizeScriptEntry(entry) {
+    if (!entry) return {};
+    if (typeof entry === 'string') return { src: entry };
+    return entry;
+  }
+
+  function appendInlineScript(handle, position, code) {
+    if (!code) return;
+    const key = handle || code.slice(0, 24);
+    const existing = document.querySelector(
+      `script[data-sg-inline-handle="${key}"][data-sg-inline-position="${position}"]`,
+    );
+    if (existing) return;
+    const script = document.createElement('script');
+    script.dataset.sgFormAsset = '1';
+    script.dataset.sgInlineHandle = key;
+    script.dataset.sgInlinePosition = position;
+    script.text = code;
+    document.body.appendChild(script);
+  }
+
+  function ensureScriptsLoaded(entries = []) {
+    const tasks = entries.map((entry) => new Promise((resolve, reject) => {
+      const scriptEntry = normalizeScriptEntry(entry);
+      const url = scriptEntry.src;
+      const handle = scriptEntry.handle || url;
+      const inlineBefore = Array.isArray(scriptEntry.inline_before)
+        ? scriptEntry.inline_before
+        : (scriptEntry.inline_before ? [scriptEntry.inline_before] : []);
+      const inlineAfter = Array.isArray(scriptEntry.inline_after)
+        ? scriptEntry.inline_after
+        : (scriptEntry.inline_after ? [scriptEntry.inline_after] : []);
+
+      if (!url) {
+        if (scriptEntry.inline_data) {
+          appendInlineScript(handle, 'data', scriptEntry.inline_data);
+        }
+        if (inlineBefore.length) {
+          appendInlineScript(handle, 'before', inlineBefore.filter(Boolean).join('\n'));
+        }
+        if (inlineAfter.length) {
+          appendInlineScript(handle, 'after', inlineAfter.filter(Boolean).join('\n'));
+        }
+        resolve();
+        return;
+      }
+
+      const existing = document.querySelector(`script[src="${url}"]`);
+      if (existing) {
+        resolve();
+        return;
+      }
+
+      if (scriptEntry.inline_data) {
+        appendInlineScript(handle, 'data', scriptEntry.inline_data);
+      }
+      if (inlineBefore.length) {
+        appendInlineScript(handle, 'before', inlineBefore.filter(Boolean).join('\n'));
+      }
+
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = false;
+      script.dataset.sgFormAsset = '1';
+      script.onload = () => {
+        if (inlineAfter.length) {
+          appendInlineScript(handle, 'after', inlineAfter.filter(Boolean).join('\n'));
+        }
+        resolve();
+      };
+      script.onerror = () => reject(new Error(`Failed to load ${url}`));
+      document.body.appendChild(script);
+    }));
+
+    return tasks.reduce((p, task) => p.then(() => task), Promise.resolve());
+  }
+
+  let formLoadPromise = null;
+
+  async function loadGravityFormMarkup(formId) {
+    // If the form is already present server-side, do not fetch/replace it.
+    const existing = document.querySelector('#swipe-game-form');
+    if (existing && existing.dataset && existing.dataset.formLoaded === '1' && existing.innerHTML && existing.innerHTML.trim()) {
+      return Promise.resolve(true);
+    }
+    if (formLoadPromise) return formLoadPromise;
+    formLoadPromise = (async () => {
+      try {
+        const endpoint = `${apiRoot}form/${formId}`;
+        const response = await fetch(endpoint, { headers });
+        if (!response.ok) {
+          throw new Error(`Form fetch failed (${response.status})`);
+        }
+        const payload = await response.json();
+        const styles = Array.isArray(payload.styles) ? payload.styles : [];
+        const scripts = Array.isArray(payload.scripts) ? payload.scripts : [];
+
+        if (styles.length) {
+          await ensureStylesLoaded(styles);
+        }
+        if (scripts.length) {
+          await ensureScriptsLoaded(scripts);
+        }
+
+        const form = $('#swipe-game-form');
+        if (form && payload.html) {
+          form.innerHTML = payload.html;
+          form.dataset.formLoaded = '1';
+
+          // The markup is generated via a REST request (wp-json). Gravity Forms will set
+          // the form action to that REST URL unless we override it.
+          const formEl = form.querySelector('form');
+          if (formEl) {
+            formEl.setAttribute('action', window.location.href.split('#')[0]);
+          }
+        }
+
+        if (window.gform && typeof window.gform.initializeOnLoaded === 'function') {
+          // Ensure initialization runs after Gravity Forms front-end scripts are ready.
+          window.gform.initializeOnLoaded(() => {
+            try {
+              if (window.gform?.core?.triggerPostRenderEvents) {
+                window.gform.core.triggerPostRenderEvents(Number(formId));
+              }
+            } catch (err) {
+              L.warn('Gravity Forms post-render initialization failed', { err });
+            }
+          });
+        }
+      } catch (err) {
+        formLoadPromise = null;
+        throw err;
+      }
+    })();
+
+    return formLoadPromise;
+  }
+
+  function displayGateForm(formId) {
+    hideIntro();
+    revealWrapper();
+    const app = $('#swipe-game-app');
+    if (app) app.style.display = 'none';
+
+    $('#sg-progress')?.remove();
+    $('.swipe-buttons')?.remove();
+    clearResultsContainer();
+
+    const form = $('#swipe-game-form');
+    L.info('Gate form container check', {
+      hasFormContainer: !!form,
+      formId,
+      markupLength: form?.innerHTML?.length || 0,
+    });
+    if (!form) {
+      renderFormGateMessage(formId);
+      return;
+    }
+
+    if (!form.innerHTML.trim()) {
+      L.warn('Gate form markup empty after loading; rendering fallback message', { formId });
+      renderFormGateMessage(formId);
+      return;
+    }
+
+    form.classList.remove('sg-hidden');
+
+    // Make sure the form submits to the current page, not to a REST URL.
+    const formEl = form.querySelector('form');
+    if (formEl) {
+      formEl.setAttribute('action', window.location.href.split('#')[0]);
+    }
+
+    // If the form was initially hidden or injected dynamically, re-trigger the Gravity Forms post-render events.
+    const reinit = () => {
+      if (window.gform?.core?.triggerPostRenderEvents) {
+        window.gform.core.triggerPostRenderEvents(Number(formId));
+      }
+    };
+
+    if (window.gform && typeof window.gform.initializeOnLoaded === 'function') {
+      window.gform.initializeOnLoaded(reinit);
+    } else {
+      document.addEventListener('gform/theme/scripts_loaded', reinit, { once: true });
+    }
+
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function showGravityFormGate(reason = 'unknown') {
+    L.info('Checking results gate', { reason });
+    if (!shouldOfferForm) return false;
+
+    const formContainer = $('#swipe-game-form');
+    const formId = Number(formContainer?.dataset?.formId) || 25;
+
+    // If the form is already rendered server-side, don't fetch it again (and don't overwrite its action URL).
+    const alreadyLoaded = !!(formContainer && formContainer.dataset?.formLoaded === '1' && formContainer.innerHTML.trim());
+
+    if (!alreadyLoaded) {
+      try {
+        await loadGravityFormMarkup(formId);
+      } catch (err) {
+        L.error('Failed to load Gravity Form markup', err);
+        renderFormGateMessage(formId);
+        return true;
+      }
+    }
+
+    displayGateForm(formId);
+    return true;
+  }
+
+  function startBatch(size) {
+    const count = Math.max(1, Number(size) || initialBatchSize);
+    const cards = activityStack.splice(0, count);
+
+    if (!cards.length) {
+      L.warn('No activities available to start batch.');
+      const box = $('#swipe-game-result');
+      if (box) {
+        box.innerHTML = '<p class="sg-completion-msg">Aucune activité disponible pour le moment.</p>';
+      }
+      return;
+    }
+
+    clearResultsContainer();
+    $('#swipe-game-form')?.classList.add('sg-hidden');
+    const app = $('#swipe-game-app');
+    if (app) app.style.display = 'block';
+
+    mountCards(cards);
+    progressTargetTotal = answeredTotal + totalCards;
+    L.info('Batch started', {
+      batchSize: count,
+      mountedCards: totalCards,
+      pendingCards: pendingCards.length,
+      remainingStack: activityStack.length,
+      answeredTotal,
+    });
+    injectButtons();
+    injectProgress();
+    updateProgress();
+    wireButtons();
+    enableDeckPointerHandlers();
+  }
+
+  function onBatchCompleted() {
+    L.info('Batch completed', {
+      answeredTotal,
+      remainingStack: activityStack.length,
+      totalAvailableActivities,
+    });
+    saveProgress('batch_complete');
+    showExtendPrompt();
+  }
+
+  function preloadCardImages(cards, limit = 2) {
+    const list = Array.isArray(cards) ? cards : [];
+    const urls = [];
+    list.forEach((card) => {
+      if (card && card.image) urls.push(card.image);
+    });
+    const unique = [...new Set(urls)].slice(0, limit);
+    unique.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }
+
+  // Stocke *toutes* les catégories dans data-cats (JSON)
+  function mountCards(data) {
+    const wrapper = $('#swipe-game-cards');
+    if (!wrapper) return;
+
+    wrapper.innerHTML = '';
+    const list = data || [];
+    totalCards = list.length;
+    const maxVisible = 8;
+    const visibleCards = list.slice(0, maxVisible);
+    pendingCards = list.slice(maxVisible);
+
+    visibleCards.forEach((card) => {
+      const el = createCardElement(card);
+      wrapper.appendChild(el);
+    });
+    preloadCardImages(list, 2);
+    setZIndices();
+    injectProgress();
+    updateProgress();
+  }
+
+  function showExtendPrompt() {
+    const box = $('#swipe-game-result');
+    const remaining = activityStack.length;
+    const nextCount = Math.min(extraBatchSize, remaining);
+    const answeredSummary = `Progression : ${answeredTotal}/${totalAvailableActivities || '…'} questions.`;
+
+    L.info('Show extend prompt', {
+      remaining,
+      nextCount,
+      answeredTotal,
+      totalAvailableActivities,
+    });
+
+    hideIntro();
+    revealWrapper();
+    const app = $('#swipe-game-app');
+    if (app) app.style.display = 'none';
+
+    $('#sg-progress')?.remove();
+    $('.swipe-buttons')?.remove();
+
+    if (!box) {
+      submitScores();
+      return;
+    }
+
+    box.innerHTML = `
+      <div class="sg-extend">
+        <h3>${answeredSummary}</h3>
+        <p>Souhaites-tu voir tes résultats ou continuer avec ${nextCount || remaining} activités supplémentaires ?</p>
+        <div class="swipe-buttons">
+          <button id="sg-see-results-btn" type="button">Voir mes résultats</button>
+          <button id="sg-extend-btn" type="button" ${nextCount === 0 ? 'disabled' : ''}>Continuer avec ${nextCount} activité${nextCount > 1 ? 's' : ''}</button>
+        </div>
+      </div>
+    `;
+
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    $('#sg-see-results-btn')?.addEventListener('click', async () => {
+      clearProgress();
+      clearResultsContainer();
+      const gated = await showGravityFormGate('see_results_click');
+      if (gated) {
+        submitScores({ showResults: false, reason: 'gate_pending' });
+        return;
+      }
+      submitScores({ reason: 'see_results_click' });
+    });
+
+    if (nextCount > 0) {
+      $('#sg-extend-btn')?.addEventListener('click', () => {
+        clearProgress();
+        clearResultsContainer();
+        startBatch(nextCount);
+      });
+    }
+  }
+
+  function wireButtons() {
+    const dislikeBtn = $('#swipe-dislike-btn');
+    const likeBtn    = $('#swipe-like-btn');
+    const passBtn    = $('#swipe-pass-btn');
+
+    if (dislikeBtn) dislikeBtn.onclick = () => {
+      if (isAnimating) return;
+      const el = topCardElement();
+      if (!el) return;
+      ensureStartOnce();
+      activeCard = el; startX = currentX = 0; startY = currentY = 0;
+      flyOut(-1); // -1 pt
+    };
+
+    if (passBtn) passBtn.onclick = () => {
+      if (isAnimating) return;
+      const el = topCardElement();
+      if (!el) return;
+      ensureStartOnce();
+      activeCard = el; startX = currentX = 0; startY = currentY = 0;
+      flyOut(0); // 0 pt
+    };
+
+    if (likeBtn) likeBtn.onclick = () => {
+      if (isAnimating) return;
+      const el = topCardElement();
+      if (!el) return;
+      ensureStartOnce();
+      activeCard = el; startX = currentX = 0; startY = currentY = 0;
+      flyOut(+1); // +2 pts
+    };
+  }
+
+  function enableDeckPointerHandlers() {
+    const deck = $('#swipe-game-app');
+    if (!deck || deckHandlersReady) return;
+    deckHandlersReady = true;
+    deck.style.touchAction = 'none';
+    deck.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }
+
+  function scheduleDragTransform() {
+    if (dragRafId) return;
+    dragRafId = window.requestAnimationFrame(() => {
+      dragRafId = 0;
+      if (!activeCard || isAnimating) return;
+      activeCard.style.transform = `translate(${pendingDx}px, ${pendingDy}px) rotate(${pendingRotate}deg)`;
+    });
+  }
+
+  // ===== Pointer & swipe =====
+  function onPointerDown(e) {
+    if (isAnimating) return;
+    const card = topCardElement();
+    if (!card || e.button === 2) return;
+    activeCard = card;
+    pointerId  = e.pointerId || 1;
+    startX = e.clientX; startY = e.clientY;
+    currentX = startX;  currentY = startY;
+    activeCard.setPointerCapture?.(pointerId);
+    activeCard.style.transition = 'none';
+    activeCard.style.boxShadow  = '0 16px 36px rgba(0,0,0,.2)';
+  }
+  function onPointerMove(e) {
+    if (!activeCard || (e.pointerId && e.pointerId !== pointerId) || isAnimating) return;
+    currentX = e.clientX;
+    currentY = startY;
+    const dx = currentX - startX;
+    const dy = 0;
+    pendingDx = dx;
+    pendingDy = dy;
+    pendingRotate = dx / 12;
+    scheduleDragTransform();
+  }
+  function onPointerUp(e) {
+    if (!activeCard || (e.pointerId && e.pointerId !== pointerId) || isAnimating) return;
+    const dx = currentX - startX;
+    if (Math.abs(dx) > threshold) {
+      ensureStartOnce();
+      flyOut(dx > 0 ? +1 : -1);
+    } else {
+      resetCard();
+    }
+  }
+
+  function flyOut(direction) {
+    if (!activeCard) return;
+
+    isAnimating = true;
+    setButtonsDisabled(true);
+    if (dragRafId) {
+      window.cancelAnimationFrame(dragRafId);
+      dragRafId = 0;
+    }
+
+    const rect = activeCard.getBoundingClientRect();
+    let tx = 0, ty = 0, rot = 0;
+
+    if (direction === 0) { // pass
+      tx = 0;
+      ty = - (window.innerHeight + rect.height) * 0.7;
+      rot = 0;
+    } else {
+      tx = (window.innerWidth + rect.width) * outDistance * direction;
+      ty = (currentY - startY) * 1.2;
+      rot = 15 * direction;
+    }
+
+    activeCard.style.transition = 'transform .35s ease-out, box-shadow .2s ease';
+    activeCard.style.transform  = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
+
+    const cardId = activeCard.dataset.id;
+    if (cardId) {
+      const idStr = String(cardId);
+      if (!answeredIds.has(idStr)) {
+        answeredIds.add(idStr);
+      }
+    }
+
+    let cats = [];
+    try { cats = JSON.parse(activeCard.dataset.cats || '[]'); }
+    catch (e) { cats = []; }
+    if (!cats || cats.length === 0) {
+      const single = (activeCard.dataset.cat || '').toUpperCase();
+      if (single) cats = [single];
+    }
+    if (cats && cats.length) {
+      cats.forEach(code => {
+        const k = String(code || '').toUpperCase();
+        if (!k) return;
+        occurrences[k] = (occurrences[k] ?? 0) + 1;
+        if (direction !== 0) {
+          const delta = direction > 0 ? 2 : -1;
+          scores[k] = (scores[k] ?? 0) + delta;
+        }
+      });
+
+      recordActivityScore(cardId, cats, direction);
+    }
+
+    activeCard.addEventListener('transitionend', () => {
+      activeCard.remove();
+      activeCard = null;
+      setZIndices();
+
+      const remaining = getRemainingCount();
+      answeredTotal = Math.max(answeredTotal + 1, answeredIds.size || answeredTotal + 1);
+
+      isAnimating = false;
+      setButtonsDisabled(false);
+      appendNextCard();
+      updateProgress();
+
+      if (remaining === 0) setTimeout(onBatchCompleted, 120);
+      saveProgress('in_progress');
+    }, { once: true });
+  }
+
+  function resetCard() {
+    if (!activeCard) return;
+    activeCard.style.transition = 'transform .24s ease, box-shadow .24s ease';
+    activeCard.style.transform  = '';
+    activeCard.style.boxShadow  = '';
+    if (dragRafId) {
+      window.cancelAnimationFrame(dragRafId);
+      dragRafId = 0;
+    }
+    activeCard = null;
+  }
+
+  // ===== Submit & Results =====
+  function submitScores({ showResults: shouldShowResults = true, reason = 'manual' } = {}) {
+    if (isSubmitting) return;
+    isSubmitting = true;
+    clearProgress();
+
+    $('.swipe-buttons')?.remove();
+    $('#sg-progress')?.remove();
+
+    fetch(`${apiRoot}submit`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        scores,
+        occurrences,
+        answered_ids: Array.from(answeredIds).map(id => Number(id) || id),
+        activity_scores: activityScores
+      })
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          const t = await r.text().catch(() => '');
+          throw new Error(`Submit failed (${r.status}) ${t}`);
+        }
+        return r.json();
+      })
+      .then((payload) => {
+        payload.remaining_activities = activityStack.length;
+        payload.answered_total = answeredTotal;
+        payload.total_available = totalAvailableActivities;
+        L.info('Submit response', {
+          remainingActivities: payload.remaining_activities,
+          answeredTotal,
+          totalAvailableActivities,
+        });
+        saveResult(payload);
+        if (shouldShowResults) {
+          showResults(payload);
+        }
+        if (hasValidationRedirect) {
+          clearResult();
+        }
+        isSubmitting = false;
+      })
+      .catch(err => {
+        isSubmitting = false;
+        alert('Une erreur est survenue lors de la sauvegarde de vos résultats.');
+      });
+  }
+
+  // Chargement unique de Google Charts
+  function loadGoogleCharts() {
+    if (window.google && google.visualization) return Promise.resolve();
+    if (loadGoogleCharts.promise) return loadGoogleCharts.promise;
+
+    loadGoogleCharts.promise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[src="https://www.gstatic.com/charts/loader.js"]');
+      const script = existing || document.createElement('script');
+
+      function onLoaderReady() {
+        if (!window.google || !google.charts) {
+          reject(new Error('Google Charts introuvable'));
+          return;
+        }
+        google.charts.load('current', { packages: ['corechart'] });
+        google.charts.setOnLoadCallback(() => resolve());
+      }
+
+      if (!existing) {
+        script.src = 'https://www.gstatic.com/charts/loader.js';
+        script.async = true;
+        script.onload = onLoaderReady;
+        script.onerror = () => reject(new Error('Chargement Google Charts échoué'));
+        document.head.appendChild(script);
+      } else if (existing.getAttribute('data-loaded')) {
+        onLoaderReady();
+      } else {
+        existing.addEventListener('load', onLoaderReady, { once: true });
+        existing.addEventListener('error', () => reject(new Error('Chargement Google Charts échoué')), { once: true });
+      }
+
+      script.setAttribute('data-loaded', '1');
+    });
+
+    return loadGoogleCharts.promise;
+  }
+
+  // ---- Bar chart via Google Charts pour bénéficier des tooltips natifs ----
+  function computeAffinityPercent(score, occurrencesCount) {
+    const occ = Number(occurrencesCount || 0);
+    if (!occ || occ < 1) return null;
+
+    const minNeg = -1 * occ;
+    const maxPos = 2 * occ;
+    const raw = ((Number(score || 0) - minNeg) / (maxPos - minNeg)) * 100;
+    const clamped = Math.max(0, Math.min(100, raw));
+
+    return Math.round(clamped);
+  }
+
+  function renderBarChart(container, scoresObj, categoriesInfo, occurrencesObj) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sg-chart-wrap';
+
+    const chartNode = document.createElement('div');
+    chartNode.className = 'sg-chart-google';
+    wrap.appendChild(chartNode);
+
+    const legend = document.createElement('div');
+    legend.className = 'sg-chart-legend';
+    legend.innerHTML = `
+      <div class="sg-chart-legend-codes">
+        <div class="sg-legend-grid">
+          <div class="sg-legend-item"><span class="sg-legend-code">A</span><span class="sg-legend-label">Artistique</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">E</span><span class="sg-legend-label">Entreprenant</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">I</span><span class="sg-legend-label">Investigatif</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">M</span><span class="sg-legend-label">Manuel</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">N</span><span class="sg-legend-label">Nature</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">C</span><span class="sg-legend-label">Organisé</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">S</span><span class="sg-legend-label">Social</span></div>
+          <div class="sg-legend-item"><span class="sg-legend-code">T</span><span class="sg-legend-label">Technique</span></div>
+        </div>
+      </div>
+      <div class="sg-chart-legend-text">Ces lettres représentent différentes catégories d’intérêts. Survolez une barre pour voir le nom complet.</div>
+      <div class="sg-chart-legend-text">Cela nous aide ensuite à te proposer les métiers les plus adaptés à ton profil.</div>
+    `;
+
+    wrap.appendChild(legend);
+    container.appendChild(wrap);
+
+    loadGoogleCharts()
+      .then(() => {
+        const data = new google.visualization.DataTable();
+        data.addColumn('string', 'Catégorie');
+        data.addColumn('number', 'Affinité (%)');
+        data.addColumn({ type: 'string', role: 'style' });
+        data.addColumn({ type: 'string', role: 'annotation' });
+        data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+
+        const cats = ['A', 'E', 'I', 'M', 'N', 'C', 'S', 'T'];
+        const values = cats.map(c => Number(scoresObj[c] || 0));
+        const occurrenceValues = cats.map(c => Number(occurrencesObj?.[c] || 0));
+        const posColor = '#1464A1';
+        const negColor = '#EC673F';
+
+        const rows = cats.map((code, idx) => {
+          const value = values[idx];
+          const occ = occurrenceValues[idx];
+          const percent = computeAffinityPercent(value, occ);
+          const fullName = (categoriesInfo && categoriesInfo[code] && categoriesInfo[code].name)
+            ? categoriesInfo[code].name
+            : `Catégorie ${code}`;
+          const tooltip = `
+            <div class="sg-chart-tooltip">
+              <strong>${code} – ${fullName}</strong><br />
+              ${percent !== null ? `Affinité : ${percent}%<br />` : ''}
+              Score : ${value}${occ ? `<br />Possibles : ${occ * 2} / ${occ * -1}` : ''}
+            </div>
+          `;
+          const annotation = percent !== null ? `${percent}%` : '–';
+          const displayed = percent !== null ? percent : 0;
+          return [code, displayed, `color: ${value >= 0 ? posColor : negColor}`, annotation, tooltip];
+        });
+
+        data.addRows(rows);
+
+        const legendCodes = legend.querySelectorAll('.sg-legend-code');
+        legendCodes.forEach((node, idx) => {
+          const value = values[idx];
+          const isNegative = value < 0;
+          node.classList.toggle('sg-negative', isNegative);
+          node.style.color = isNegative ? negColor : posColor;
+        });
+
+        const options = {
+          height: 280,
+          backgroundColor: 'transparent',
+          legend: 'none',
+          tooltip: { isHtml: true },
+          chartArea: { left: 12, right: 12, top: 20, bottom: 36 },
+          annotations: {
+            alwaysOutside: true,
+            textStyle: { color: '#202124', fontSize: 12, bold: true },
+            stem: { color: 'transparent', length: 0 },
+          },
+          vAxis: {
+            viewWindowMode: 'explicit',
+            viewWindow: { min: 0, max: 100 },
+            gridlines: { color: 'transparent' },
+            textPosition: 'none',
+            baselineColor: 'transparent',
+            minorGridlines: { color: 'transparent' },
+          },
+          hAxis: {
+            textStyle: { color: '#202124', fontSize: 12, bold: true },
+            baselineColor: '#c1c7d0',
+            gridlines: { color: 'transparent' },
+            minorGridlines: { color: 'transparent' },
+          },
+          bar: { groupWidth: '65%' },
+        };
+
+        const chart = new google.visualization.ColumnChart(chartNode);
+        chart.draw(data, options);
+      })
+      .catch(err => {
+        chartNode.innerHTML = '<p style="text-align:center; margin:12px 0;">Graphique indisponible pour le moment.</p>';
+      });
+  }
+
+  function renderAdvice(block, adviceList) {
+    if (!block) return;
+    if (!adviceList || !adviceList.length) {
+      block.innerHTML = '<p class="sg-completion-msg">Désolé, mais aucun résultat probant pour le moment. Veuillez répondre à plus de questions.</p>';
+      return;
+    }
+    const html = adviceList.map(a => `
+      <div class="sg-advice-item">
+        <h4>${a.name || a.code}</h4>
+        ${a.description ? `<div class="sg-advice-text">${a.description}</div>` : ''}
+      </div>
+    `).join('');
+    block.innerHTML = html;
+  }
+
+  function applyResultState(payload) {
+    if (!payload || typeof payload !== 'object') return;
+
+    if (Array.isArray(payload.answered_ids)) {
+      payload.answered_ids.forEach(id => {
+        const safeId = String(id);
+        if (safeId) answeredIds.add(safeId);
+      });
+      answeredTotal = answeredIds.size;
+    }
+
+    if (payload.scores && typeof payload.scores === 'object') {
+      CAT_CODES.forEach(code => {
+        if (Object.prototype.hasOwnProperty.call(payload.scores, code)) {
+          scores[code] = Number(payload.scores[code]) || 0;
+        }
+      });
+    }
+
+    if (payload.occurrences && typeof payload.occurrences === 'object') {
+      CAT_CODES.forEach(code => {
+        if (Object.prototype.hasOwnProperty.call(payload.occurrences, code)) {
+          occurrences[code] = Number(payload.occurrences[code]) || 0;
+        }
+      });
+    }
+
+    if (Array.isArray(payload.activity_scores)) {
+      payload.activity_scores.forEach(entry => {
+        if (!entry) return;
+        recordActivityScore(entry.id, entry.categories, entry.score);
+      });
+    }
+  }
+
+  function syncActivityStackAfterResult() {
+    if (activityStack.length) {
+      activityStack = activityStack.filter(item => !answeredIds.has(String(item.id)));
+    }
+    totalAvailableActivities = answeredIds.size + activityStack.length;
+  }
+
+  function showResults(payload) {
+    const app = $('#swipe-game-app');
+    hideIntro();
+    revealWrapper();
+    if (app) app.style.display = 'none';
+    $('#swipe-game-form')?.classList.add('sg-hidden');
+    $('#sg-progress')?.remove();
+    $('.swipe-buttons')?.remove();
+
+    const box = $('#swipe-game-result');
+    if (!box) return;
+
+    if (payload.occurrences && typeof payload.occurrences === 'object') {
+      CAT_CODES.forEach(code => {
+        if (Object.prototype.hasOwnProperty.call(payload.occurrences, code)) {
+          occurrences[code] = Number(payload.occurrences[code]) || 0;
+        }
+      });
+    }
+
+    const remainingActivities = typeof payload.remaining_activities === 'number'
+      ? payload.remaining_activities
+      : 0;
+    const totalAvailable = payload.total_available || totalAvailableActivities || 0;
+    const answered = payload.answered_total || answeredTotal;
+    const answeredSummary = buildAnsweredSummary(answered, totalAvailable || null);
+    const completedAll = remainingActivities === 0 && (totalAvailable === 0 || answered >= totalAvailable);
+    const nextCount = Math.min(extraBatchSize, remainingActivities);
+    const completionMessage = completedAll
+      ? 'Bravo ! Vous avez répondu à toutes les activités disponibles.'
+      : `Il reste ${remainingActivities} activité${remainingActivities > 1 ? 's' : ''} pour affiner vos résultats.`;
+    const refineButton = remainingActivities > 0
+      ? `<button id="sg-refine-btn" type="button">Affiner avec ${nextCount} activité${nextCount > 1 ? 's' : ''} supplémentaire${nextCount > 1 ? 's' : ''}</button>`
+      : '';
+
+    let html = `
+      <h3 class="sg-title">🎯 Vos domaines dominants :</h3>
+      <p class="sg-completion-msg">${completionMessage}</p>
+      <div class="sg-advice" id="sg-advice-block"></div>
+      <div class="sg-results-grid">
+        <div class="sg-results-left">
+          <h4 class="sg-block-title">Vos scores par catégorie</h4>
+          <div id="sg-chart"></div>
+        </div>
+        <div class="sg-results-right">
+          <h4 class="sg-block-title">Top 10 métiers suggérés</h4>
+          <ol class="sg-metiers-list">
+            ${ (payload.metiers || []).map(m => `
+              ${(() => {
+                const obtained = typeof m.obtained_points === 'number' ? formatPoints(m.obtained_points) : null;
+                const obtainable = typeof m.obtainable_points === 'number' ? formatPoints(m.obtainable_points) : null;
+                const pointsTitle = obtained !== null && obtainable !== null
+                  ? `${obtained} / ${obtainable} pts obtenus`
+                  : '';
+                return `
+              <li>
+                <a href="${m.link}">${m.title}</a>
+                <span class="sg-badge"${pointsTitle ? ` title="${pointsTitle}"` : ''}>${typeof m.total_score === 'number' ? `${Math.round(m.total_score * 100)}% d'affinité` : ''}</span>
+              </li>
+                `;
+              })()}
+            `).join('') }
+          </ol>
+        </div>
+      </div>
+      <div class="swipe-buttons" style="margin-top:20px">
+        ${refineButton ? `<p class="sg-completion-msg" style="align-content: center; margin:0;">${answeredSummary}</p>` : ''}
+        ${refineButton}
+        <button id="swipe-restart-btn" type="button">Effacer les résultats et recommencer le test</button>
+      </div>
+    `;
+
+    box.innerHTML = html;
+
+    // Conseils (en haut)
+    const adviceBlock = $('#sg-advice-block', box);
+    const dominantAdvice = (payload.advice_list || [])
+      .map(item => {
+        const score = payload.scores ? payload.scores[item.code] : null;
+        const occ = payload.occurrences ? payload.occurrences[item.code] : occurrences[item.code];
+        const percent = computeAffinityPercent(score, occ);
+        return { ...item, percent };
+      })
+      .filter(item => item.percent !== null && item.percent >= 40)
+      .slice(0, 3);
+    renderAdvice(adviceBlock, dominantAdvice);
+
+    // Chart (avec noms complets pour tooltip)
+    const chartHost = $('#sg-chart', box);
+    if (chartHost) renderBarChart(chartHost, payload.scores || {}, payload.categories_info || {}, payload.occurrences || occurrences);
+
+    if (remainingActivities > 0) {
+      $('#sg-refine-btn')?.addEventListener('click', () => {
+        clearResult();
+        clearResultsContainer();
+        startBatch(nextCount);
+        $('#swipe-game-app')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+
+    // Restart : purge métas + bypass cache avec param
+    $('#swipe-restart-btn')?.addEventListener('click', () => {
+      clearProgress();
+      clearResult();
+      fetch(`${apiRoot}restart`, { method: 'POST', headers })
+        .then(() => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('sg_restart', Date.now().toString());
+          window.location.href = url.toString();
+        })
+        .catch(() => {});
+    });
+  }
+
+  // ===== Boot =====
+  savedProgress = loadSavedProgress();
+  wireIntroGate();
+  const savedResult = loadSavedResult();
+  fetch(`${apiRoot}activities`, { headers: { 'X-WP-Nonce': SwipeGame.nonce } })
+    .then(r => r.json())
+    .then(data => {
+      activityStack = Array.isArray(data) ? data.slice() : [];
+      totalAvailableActivities = activityStack.length;
+      if (savedProgress) {
+        applySavedProgress(savedProgress);
+        if (activityStack.length) {
+          activityStack = activityStack.filter(item => !answeredIds.has(String(item.id)));
+        }
+        totalAvailableActivities = typeof savedProgress.total_available === 'number'
+          ? savedProgress.total_available
+          : answeredIds.size + activityStack.length;
+        shouldShowSavedPrompt = savedProgress.stage === 'batch_complete';
+      }
+    })
+    .catch(err => {
+      activityStack = [];
+      totalAvailableActivities = 0;
+    })
+    .finally(() => {
+      fetch(`${apiRoot}result`, { headers: { 'X-WP-Nonce': SwipeGame.nonce } })
+        .then(r => r.json())
+        .then(async payload => {
+          if (payload && payload.has_result) {
+            applyResultState(payload);
+            syncActivityStackAfterResult();
+            payload.remaining_activities = activityStack.length;
+            payload.answered_total = answeredTotal;
+            payload.total_available = totalAvailableActivities;
+            showResults(payload);
+            return;
+          }
+
+          if (savedResult) {
+            applyResultState(savedResult);
+            syncActivityStackAfterResult();
+            savedResult.remaining_activities = activityStack.length;
+            savedResult.answered_total = answeredTotal;
+            savedResult.total_available = totalAvailableActivities;
+
+            if (hasValidationRedirect) {
+              // The user already filled the form and validated via email.
+              // Skip the form gate – show saved results directly.  This
+              // also acts as a safety-net when Safari iOS fails to store
+              // the auth cookie during the redirect.
+              showResults(savedResult);
+              clearResult();
+              return;
+            }
+
+            if (shouldShowSavedPrompt || !isLoggedIn) {
+              showExtendPrompt();
+              return;
+            }
+          }
+
+          if (shouldShowSavedPrompt) {
+            showExtendPrompt();
+          } else if (activityStack.length) {
+            const resumeBatchSize = savedProgress
+              ? Math.max(1, initialBatchSize - answeredTotal)
+              : initialBatchSize;
+            startBatch(Math.min(resumeBatchSize, activityStack.length));
+          } else {
+          }
+        })
+        .catch(() => {
+          if (activityStack.length) {
+            const resumeBatchSize = savedProgress
+              ? Math.max(1, initialBatchSize - answeredTotal)
+              : initialBatchSize;
+            startBatch(Math.min(resumeBatchSize, activityStack.length));
+          } else {
+          }
+        });
+    });
+})();
