@@ -7,7 +7,19 @@
   <title>Xaadi — Démo Yeekai</title>
   <style>
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-    iframe { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; }
+    /*
+      ⚠️ SCOPING CRITICAL :
+      utiliser l'ID #site-background-iframe (pas le sélecteur `iframe` nu)
+      pour ne PAS impacter l'iframe interne du panneau Yeekai (#yk-frame)
+      qui s'ouvre au clic FAB. Sinon le panneau Yeekai casse :
+        - son header "Propulsé par Yeekai" est caché derrière l'iframe
+          chat qui s'échappe via position:fixed inset:0
+        - l'input bar est cut off par les 100vh forcés au viewport
+          au lieu d'être contenu dans le panneau Yeekai
+    */
+    #site-background-iframe {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0;
+    }
   </style>
 </head>
 <body>
@@ -27,6 +39,7 @@
       → fallback : wget clone classique
   -->
   <iframe
+    id="site-background-iframe"
     src="https://www.xaadi.legal"
     title="xaadi.legal"
     allow="fullscreen; geolocation; camera; microphone"
