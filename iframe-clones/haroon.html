@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Haroon — Démo Yeekai</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    /*
+      ⚠️ SCOPING CRITICAL :
+      utiliser l'ID #site-background-iframe (pas le sélecteur `iframe` nu)
+      pour ne PAS impacter l'iframe interne du panneau Yeekai (#yk-frame)
+      qui s'ouvre au clic FAB. Sinon le panneau Yeekai casse :
+        - son header "Propulsé par Yeekai" est caché derrière l'iframe
+          chat qui s'échappe via position:fixed inset:0
+        - l'input bar est cut off par les 100vh forcés au viewport
+          au lieu d'être contenu dans le panneau Yeekai
+      Bug détecté + fixé sur le wrapper Xaadi avant ce fichier (commit 22af8ece).
+    */
+    #site-background-iframe {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Approche "iframe wrapper" : on iframe le site live haroon-app.com en
+    plein écran et on injecte l'embed Yeekai par-dessus.
+
+    Avantages vs wget clone :
+    - Setup 30 secondes au lieu de 2h
+    - Toujours synchronisé avec le vrai site (pas de stale content)
+    - Pas de stockage Mo de HTML à GitHub
+    - Particulièrement utile pour Haroon qui est une SPA Vite/React (le
+      wget classique ne récupérerait que le HTML shell vide)
+
+    Limites :
+    - L'URL dans la barre reste alamine-dot.github.io (pas haroon-app.com)
+      → invisible dans un Loom recordé sans afficher l'URL bar
+    - Si haroon-app.com active X-Frame-Options un jour, ça cassera
+      → fallback : Playwright headless ou interroger leur API si exposée
+  -->
+  <iframe
+    id="site-background-iframe"
+    src="https://haroon-app.com/fr"
+    title="haroon-app.com"
+    allow="fullscreen; geolocation; camera; microphone"
+  ></iframe>
+
+  <!-- Yeekai Embed -->
+  <script
+    src="https://yeekai-embed-js.vercel.app/v1/embed.js"
+    data-tenant="haroon"
+    data-app-url="https://yeekai-embed-ai-front.vercel.app/haroon"
+    data-disclaimer-target="https://haroon-app.com/fr"
+    async
+  ></script>
+  <!-- End Yeekai Embed -->
+</body>
+</html>
