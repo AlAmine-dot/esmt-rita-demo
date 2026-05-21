@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>TechItAll Learn — Démo Yeekai</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    /*
+      ⚠️ SCOPING CRITICAL :
+      utiliser l'ID #site-background-iframe (pas le sélecteur `iframe` nu)
+      pour ne PAS impacter l'iframe interne du panneau Yeekai (#yk-frame)
+      qui s'ouvre au clic FAB. Cf bug détecté + fixé sur Xaadi (commit 22af8ece).
+    */
+    #site-background-iframe {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Approche "iframe wrapper" pour POC cold reach TechItAll Learn.
+    Site WordPress (o2switch + /wp-json/ exposé) — donc si on veut aller
+    plus loin un jour, on peut faire un Diaby-like (sync_corpus via REST
+    API WP, comme pour LGF). Mais pour ce POC initial, juste le wrapper.
+  -->
+  <iframe
+    id="site-background-iframe"
+    src="https://www.learn.techitall.co"
+    title="learn.techitall.co"
+    allow="fullscreen; geolocation; camera; microphone"
+  ></iframe>
+
+  <!-- Yeekai Embed -->
+  <script
+    src="https://yeekai-embed-js.vercel.app/v1/embed.js"
+    data-tenant="techitall"
+    data-app-url="https://yeekai-embed-ai-front.vercel.app/techitall"
+    data-disclaimer-target="https://www.learn.techitall.co"
+    async
+  ></script>
+  <!-- End Yeekai Embed -->
+</body>
+</html>
