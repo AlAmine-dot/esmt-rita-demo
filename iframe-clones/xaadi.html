@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Xaadi — Démo Yeekai</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    iframe { position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0; }
+  </style>
+</head>
+<body>
+  <!--
+    Approche "iframe wrapper" : on iframe le site live xaadi.legal en
+    plein écran et on injecte l'embed Yeekai par-dessus.
+
+    Avantages vs wget clone :
+    - Setup 30 secondes au lieu de 2h
+    - Toujours synchronisé avec le vrai site (pas de stale content)
+    - Pas de stockage Mo de HTML à GitHub
+
+    Limites :
+    - L'URL dans la barre reste alamine-dot.github.io (pas xaadi.legal)
+      → invisible dans un Loom recordé sans afficher l'URL bar
+    - Si xaadi.legal active X-Frame-Options un jour, ça cassera
+      → fallback : wget clone classique
+  -->
+  <iframe
+    src="https://www.xaadi.legal"
+    title="xaadi.legal"
+    allow="fullscreen; geolocation; camera; microphone"
+  ></iframe>
+
+  <!-- Yeekai Embed -->
+  <script
+    src="https://yeekai-embed-js.vercel.app/v1/embed.js"
+    data-tenant="xaadi"
+    data-app-url="https://yeekai-embed-ai-front.vercel.app/xaadi"
+    data-disclaimer-target="https://www.xaadi.legal"
+    async
+  ></script>
+  <!-- End Yeekai Embed -->
+</body>
+</html>
