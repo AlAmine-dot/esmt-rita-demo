@@ -43,12 +43,37 @@
     allow="fullscreen; geolocation; camera; microphone"
   ></iframe>
 
+  <!--
+    ⚠️ HYPOTHÈSE UX SEAMLESS TESTÉE POUR STEAMY (mai 2026)
+    ===================================================
+
+    Steamy a déjà un Tawk.io en bas-DROITE pour le chat humain.
+    Pour ne pas concurrencer mais COMPLÉTER ce canal, l'embed Yeekai :
+    - Se positionne en bas-GAUCHE (data-fab-position="left")
+    - Affiche une icône WhatsApp (data-fab-icon-style="whatsapp")
+    - Click → ouvre une interface chat WhatsApp-like (?ui=whatsapp sur l'app)
+
+    L'idée = se présenter comme "canal direct WhatsApp avec l'entreprise"
+    plutôt que comme un n-ième bouton de chat générique.
+
+    POUR DÉSACTIVER cette hypothèse et revenir au comportement standard Yeekai :
+    - Retirer les 2 lignes data-fab-position + data-fab-icon-style
+    - Retirer "?ui=whatsapp" du data-app-url
+    Le FAB redeviendra droite + avatar + skin chat default.
+
+    PRÉREQUIS PROD :
+    - embed.js v1.1.0+ (sinon data-fab-* params ignorés silencieusement, FAB reste à droite avec avatar)
+    - front IA SteamyApp avec détection ?ui=whatsapp (sinon iframe ouvre la skin default classique)
+    -> Tant que les 2 ne sont pas live, dégradation gracieuse (l'iframe wrapper marche, juste sans le seamless visuel WA).
+  -->
   <!-- Yeekai Embed -->
   <script
     src="https://yeekai-embed-js.vercel.app/v1/embed.js"
     data-tenant="steamy"
-    data-app-url="https://yeekai-embed-ai-front.vercel.app/steamy"
+    data-app-url="https://yeekai-embed-ai-front.vercel.app/steamy?ui=whatsapp"
     data-disclaimer-target="https://www.learn.techitall.co"
+    data-fab-position="left"
+    data-fab-icon-style="whatsapp"
     async
   ></script>
   <!-- End Yeekai Embed -->
