@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Laboussole — Démo Yeekai</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    /*
+      ⚠️ SCOPING CRITICAL :
+      utiliser l'ID #site-background-iframe (pas le sélecteur `iframe` nu)
+      pour ne PAS impacter l'iframe interne du panneau Yeekai (#yk-frame)
+      qui s'ouvre au clic FAB. Cf bug détecté + fixé sur Xaadi (commit 22af8ece).
+    */
+    #site-background-iframe {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Iframe wrapper — Laboussole (CareerTech Cameroun, tenant #3 Yeekai).
+    Site réel : https://laboussole-edu.com (vérifié 2026-07-15 : pas de
+    X-Frame-Options ni CSP frame-ancestors → embarquable en iframe).
+
+    Premier tenant branché sur le canal web « un seul cerveau »
+    (POST /web/laboussole/chat = le pipeline Chakra complet, même cerveau
+    que WhatsApp — persona Will).
+
+    ⚠️ URLS LOCALES DE TEST (dev) — À BASCULER SUR RENDER quand le static
+    site du front sera créé (embed.js y est servi sur /v1/embed.js) :
+      src           → https://<front-render-host>/v1/embed.js
+      data-app-url  → https://<front-render-host>/laboussole
+      data-embed-key→ la vraie clé (env WEBCHAT_EMBED_KEY_LABOUSSOLE Render)
+    (Vercel décommissionné 2026-07 — ne plus pointer *.vercel.app.)
+  -->
+  <iframe
+    id="site-background-iframe"
+    src="https://laboussole-edu.com"
+    title="Laboussole — laboussole-edu.com"
+    allow="fullscreen"
+  ></iframe>
+
+  <!-- Yeekai Embed -->
+  <script
+    src="http://127.0.0.1:5173/v1/embed.js"
+    data-tenant="laboussole"
+    data-app-url="http://127.0.0.1:5173/laboussole"
+    data-embed-key="pk_laboussole_test123"
+    data-disclaimer-target="https://laboussole-edu.com"
+    async
+  ></script>
+  <!-- End Yeekai Embed -->
+</body>
+</html>
