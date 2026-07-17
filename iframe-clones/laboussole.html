@@ -42,12 +42,18 @@
     allow="fullscreen"
   ></iframe>
 
-  <!-- Yeekai Embed -->
+  <!--
+    Yeekai Embed — CLONE INTERNE (tests PM). data-env="staging" verrouille
+    le backend sur staging (isolation totale de la prod). La clé
+    "pk_laboussole_staging_..." est distincte de la prod (générée via
+    scripts/generate_embed_key.py laboussole staging côté yeebot-2.0).
+  -->
   <script
     src="https://yeekai-embed-ai-front.onrender.com/v1/embed.js"
     data-tenant="laboussole"
     data-app-url="https://yeekai-embed-ai-front.onrender.com/laboussole"
     data-embed-key="pk_laboussole_test123"
+    data-env="staging"
     data-fab-icon-style="whatsapp"
     data-disclaimer-target="https://laboussole-edu.com"
     async

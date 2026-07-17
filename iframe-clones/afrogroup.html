@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>AFRO Group / Afrodemy — Démo Yeekai</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+    /*
+      ⚠️ SCOPING CRITICAL :
+      #site-background-iframe (pas iframe nu) — sinon on casse aussi #yk-frame
+      qui s'ouvre au clic FAB. Cf bug historique Xaadi (commit 22af8ece).
+    */
+    #site-background-iframe {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Iframe wrapper — AFRO Group / Afrodemy (éducation financière Sénégal,
+    tenant #4 Yeekai, persona Bassirou).
+
+    ⚠️ Le vrai site AFRO Group refuse peut-être l'iframing (à valider :
+    X-Frame-Options / CSP frame-ancestors). Fallback : le clone statique
+    des pages du site vit dans `afrodemy-clone/` de ce repo (existant).
+    Ici on tente le site réel — si écran blanc, ouvrir plutôt
+    `afrodemy-clone/index.html` en local.
+  -->
+  <iframe
+    id="site-background-iframe"
+    src="https://afrogroup-holdings.com"
+    title="AFRO Group — afrogroup-holdings.com"
+    allow="fullscreen"
+  ></iframe>
+
+  <!--
+    Yeekai Embed — CLONE INTERNE (tests PM). data-env="staging" verrouille
+    le backend sur staging. La clé staging est distincte de la prod.
+  -->
+  <script
+    src="https://yeekai-embed-ai-front.onrender.com/v1/embed.js"
+    data-tenant="afrogroup"
+    data-app-url="https://yeekai-embed-ai-front.onrender.com/afrogroup"
+    data-embed-key="pk_afrogroup_test123"
+    data-env="staging"
+    data-fab-icon-style="whatsapp"
+    data-disclaimer-target="https://afrogroup-holdings.com"
+    async
+  ></script>
+  <!-- End Yeekai Embed -->
+</body>
+</html>
